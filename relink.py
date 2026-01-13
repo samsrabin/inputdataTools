@@ -32,7 +32,7 @@ def find_and_replace_owned_files(source_dir, target_dir, username):
     for dirpath, dirnames, filenames in os.walk(source_dir):
         for filename in filenames:
             file_path = os.path.join(dirpath, filename)
-            
+
             # Use os.stat().st_uid to get the file's owner UID
             try:
                 if os.path.islink(file_path):
@@ -42,14 +42,14 @@ def find_and_replace_owned_files(source_dir, target_dir, username):
                 file_uid = os.stat(file_path).st_uid
             except FileNotFoundError:
                 continue # Skip if file was deleted during traversal
-            
+
             if file_uid == user_uid:
                 print(f"Found owned file: {file_path}")
 
                 # Determine the relative path and the new link's destination
                 relative_path = os.path.relpath(file_path, source_dir)
                 link_target = os.path.join(target_dir, relative_path)
-                
+
                 # Check if the target file actually exists
                 if not os.path.exists(link_target):
                     print(f"Warning: Corresponding file not found in '{target_dir}' for '{file_path}'. Skipping.")
@@ -80,9 +80,9 @@ def find_and_replace_owned_files(source_dir, target_dir, username):
 def parse_arguments():
     """
     Parse command-line arguments.
-    
+
     Returns:
-        argparse.Namespace: Parsed arguments containing source_root 
+        argparse.Namespace: Parsed arguments containing source_root
                             and target_root.
     """
     parser = argparse.ArgumentParser(
@@ -115,5 +115,3 @@ if __name__ == '__main__':
 
     # --- Execution ---
     find_and_replace_owned_files(args.source_root, args.target_root, my_username)
-    
-
