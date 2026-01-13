@@ -86,7 +86,7 @@ class TestFindAndReplaceOwnedFiles:
         assert os.path.islink(source_file), "Nested file should be a symlink"
         assert os.readlink(source_file) == target_file
 
-    def test_skip_existing_symlinks(self, temp_dirs, current_user):
+    def test_skip_existing_symlinks(self, temp_dirs, current_user, capsys):
         """Test that existing symlinks are skipped."""
         source_dir, target_dir = temp_dirs
         username = current_user
@@ -118,6 +118,11 @@ class TestFindAndReplaceOwnedFiles:
         assert (
             os.readlink(source_link) == dummy_target
         ), "Symlink target should be unchanged"
+
+        # Check that "Skipping symlink" message was printed
+        captured = capsys.readouterr()
+        assert "Skipping symlink:" in captured.out
+        assert source_link in captured.out
 
     def test_missing_target_file(self, temp_dirs, current_user, capsys):
         """Test behavior when target file doesn't exist."""
@@ -214,6 +219,64 @@ class TestFindAndReplaceOwnedFiles:
             assert os.path.islink(source_file)
         finally:
             os.chdir(cwd)
+
+    def test_print_searching_message(self, temp_dirs, current_user, capsys):
+        """Test that searching message is printed."""
+        source_dir, target_dir = temp_dirs
+        username = current_user
+
+        # Run the function
+        relink.find_and_replace_owned_files(source_dir, target_dir, username)
+
+        # Check that searching message was printed
+        captured = capsys.readouterr()
+        assert f"Searching for files owned by '{username}'" in captured.out
+        assert f"in '{os.path.abspath(source_dir)}'" in captured.out
+
+    def test_print_found_owned_file(self, temp_dirs, current_user, capsys):
+        """Test that 'Found owned file' message is printed."""
+        source_dir, target_dir = temp_dirs
+        username = current_user
+
+        # Create a file owned by current user
+        source_file = os.path.join(source_dir, "owned_file.txt")
+        target_file = os.path.join(target_dir, "owned_file.txt")
+
+        with open(source_file, "w", encoding="utf-8") as f:
+            f.write("content")
+        with open(target_file, "w", encoding="utf-8") as f:
+            f.write("target content")
+
+        # Run the function
+        relink.find_and_replace_owned_files(source_dir, target_dir, username)
+
+        # Check that "Found owned file" message was printed
+        captured = capsys.readouterr()
+        assert "Found owned file:" in captured.out
+        assert source_file in captured.out
+
+    def test_print_deleted_and_created_messages(self, temp_dirs, current_user, capsys):
+        """Test that deleted and created symlink messages are printed."""
+        source_dir, target_dir = temp_dirs
+        username = current_user
+
+        # Create files
+        source_file = os.path.join(source_dir, "test_file.txt")
+        target_file = os.path.join(target_dir, "test_file.txt")
+
+        with open(source_file, "w", encoding="utf-8") as f:
+            f.write("source")
+        with open(target_file, "w", encoding="utf-8") as f:
+            f.write("target")
+
+        # Run the function
+        relink.find_and_replace_owned_files(source_dir, target_dir, username)
+
+        # Check messages
+        captured = capsys.readouterr()
+        assert "Deleted original file:" in captured.out
+        assert "Created symbolic link:" in captured.out
+        assert f"{source_file} -> {target_file}" in captured.out
 
 
 class TestParseArguments:
@@ -323,3 +386,57 @@ class TestEdgeCases:
         # Verify
         assert os.path.islink(source_file)
         assert os.readlink(source_file) == target_file
+
+    def test_error_deleting_file(self, temp_dirs, capsys):
+        """Test error message when file deletion fails."""
+        source_dir, target_dir = temp_dirs
+        username = os.environ["USER"]
+
+        # Create files
+        source_file = os.path.join(source_dir, "test.txt")
+        target_file = os.path.join(target_dir, "test.txt")
+
+        with open(source_file, "w", encoding="utf-8") as f:
+            f.write("source")
+        with open(target_file, "w", encoding="utf-8") as f:
+            f.write("target")
+
+        # Mock os.rename to raise an error
+        def mock_rename(src, dst):
+            raise OSError("Simulated rename error")
+
+        with patch("os.rename", side_effect=mock_rename):
+            # Run the function
+            relink.find_and_replace_owned_files(source_dir, target_dir, username)
+
+            # Check error message
+            captured = capsys.readouterr()
+            assert "Error deleting file" in captured.out
+            assert source_file in captured.out
+
+    def test_error_creating_symlink(self, temp_dirs, capsys):
+        """Test error message when symlink creation fails."""
+        source_dir, target_dir = temp_dirs
+        username = os.environ["USER"]
+
+        # Create source file
+        source_file = os.path.join(source_dir, "test.txt")
+        target_file = os.path.join(target_dir, "test.txt")
+
+        with open(source_file, "w", encoding="utf-8") as f:
+            f.write("source")
+        with open(target_file, "w", encoding="utf-8") as f:
+            f.write("target")
+
+        # Mock os.symlink to raise an error
+        def mock_symlink(src, dst):
+            raise OSError("Simulated symlink error")
+
+        with patch("os.symlink", side_effect=mock_symlink):
+            # Run the function
+            relink.find_and_replace_owned_files(source_dir, target_dir, username)
+
+            # Check error message
+            captured = capsys.readouterr()
+            assert "Error creating symlink" in captured.out
+            assert source_file in captured.out
