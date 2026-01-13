@@ -7,12 +7,29 @@ import sys
 import tempfile
 import shutil
 import pwd
+import logging
 from unittest.mock import patch
+
 import pytest
 
 # Add parent directory to path to import relink module
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-import relink
+import relink  # noqa: E402
+
+
+@pytest.fixture(scope="function", autouse=True)
+def configure_logging():
+    """Configure logging to output to stdout for all tests."""
+    # Configure logging before each test
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(message)s",
+        stream=sys.stdout,
+        force=True,  # Force reconfiguration
+    )
+    yield
+    # Clean up logging handlers after each test
+    logging.getLogger().handlers.clear()
 
 
 class TestFindAndReplaceOwnedFiles:
@@ -86,7 +103,7 @@ class TestFindAndReplaceOwnedFiles:
         assert os.path.islink(source_file), "Nested file should be a symlink"
         assert os.readlink(source_file) == target_file
 
-    def test_skip_existing_symlinks(self, temp_dirs, current_user, capsys):
+    def test_skip_existing_symlinks(self, temp_dirs, current_user, caplog):
         """Test that existing symlinks are skipped."""
         source_dir, target_dir = temp_dirs
         username = current_user
@@ -107,7 +124,8 @@ class TestFindAndReplaceOwnedFiles:
         mtime_before = stat_before.st_mtime
 
         # Run the function
-        relink.find_and_replace_owned_files(source_dir, target_dir, username)
+        with caplog.at_level(logging.INFO):
+            relink.find_and_replace_owned_files(source_dir, target_dir, username)
 
         # Verify the symlink is unchanged (same inode means it wasn't deleted/recreated)
         stat_after = os.lstat(source_link)
@@ -119,12 +137,11 @@ class TestFindAndReplaceOwnedFiles:
             os.readlink(source_link) == dummy_target
         ), "Symlink target should be unchanged"
 
-        # Check that "Skipping symlink" message was printed
-        captured = capsys.readouterr()
-        assert "Skipping symlink:" in captured.out
-        assert source_link in captured.out
+        # Check that "Skipping symlink" message was logged
+        assert "Skipping symlink:" in caplog.text
+        assert source_link in caplog.text
 
-    def test_missing_target_file(self, temp_dirs, current_user, capsys):
+    def test_missing_target_file(self, temp_dirs, current_user, caplog):
         """Test behavior when target file doesn't exist."""
         source_dir, target_dir = temp_dirs
         username = current_user
@@ -135,17 +152,17 @@ class TestFindAndReplaceOwnedFiles:
             f.write("orphan content")
 
         # Run the function
-        relink.find_and_replace_owned_files(source_dir, target_dir, username)
+        with caplog.at_level(logging.INFO):
+            relink.find_and_replace_owned_files(source_dir, target_dir, username)
 
         # Verify the file is NOT converted to symlink
         assert not os.path.islink(source_file), "File should not be a symlink"
         assert os.path.isfile(source_file), "Original file should still exist"
 
         # Check warning message
-        captured = capsys.readouterr()
-        assert "Warning: Corresponding file not found" in captured.out
+        assert "Warning: Corresponding file not found" in caplog.text
 
-    def test_invalid_username(self, temp_dirs, capsys):
+    def test_invalid_username(self, temp_dirs, caplog):
         """Test behavior with invalid username."""
         source_dir, target_dir = temp_dirs
 
@@ -159,12 +176,14 @@ class TestFindAndReplaceOwnedFiles:
             raise RuntimeError(f"{invalid_username=} DOES actually exist")
 
         # Run the function
-        relink.find_and_replace_owned_files(source_dir, target_dir, invalid_username)
+        with caplog.at_level(logging.INFO):
+            relink.find_and_replace_owned_files(
+                source_dir, target_dir, invalid_username
+            )
 
         # Check error message
-        captured = capsys.readouterr()
-        assert "Error: User" in captured.out
-        assert "not found" in captured.out
+        assert "Error: User" in caplog.text
+        assert "not found" in caplog.text
 
     def test_multiple_files(self, temp_dirs, current_user):
         """Test with multiple files in the directory."""
@@ -220,20 +239,20 @@ class TestFindAndReplaceOwnedFiles:
         finally:
             os.chdir(cwd)
 
-    def test_print_searching_message(self, temp_dirs, current_user, capsys):
+    def test_print_searching_message(self, temp_dirs, current_user, caplog):
         """Test that searching message is printed."""
         source_dir, target_dir = temp_dirs
         username = current_user
 
         # Run the function
-        relink.find_and_replace_owned_files(source_dir, target_dir, username)
+        with caplog.at_level(logging.INFO):
+            relink.find_and_replace_owned_files(source_dir, target_dir, username)
 
-        # Check that searching message was printed
-        captured = capsys.readouterr()
-        assert f"Searching for files owned by '{username}'" in captured.out
-        assert f"in '{os.path.abspath(source_dir)}'" in captured.out
+        # Check that searching message was logged
+        assert f"Searching for files owned by '{username}'" in caplog.text
+        assert f"in '{os.path.abspath(source_dir)}'" in caplog.text
 
-    def test_print_found_owned_file(self, temp_dirs, current_user, capsys):
+    def test_print_found_owned_file(self, temp_dirs, current_user, caplog):
         """Test that 'Found owned file' message is printed."""
         source_dir, target_dir = temp_dirs
         username = current_user
@@ -248,14 +267,14 @@ class TestFindAndReplaceOwnedFiles:
             f.write("target content")
 
         # Run the function
-        relink.find_and_replace_owned_files(source_dir, target_dir, username)
+        with caplog.at_level(logging.INFO):
+            relink.find_and_replace_owned_files(source_dir, target_dir, username)
 
-        # Check that "Found owned file" message was printed
-        captured = capsys.readouterr()
-        assert "Found owned file:" in captured.out
-        assert source_file in captured.out
+        # Check that "Found owned file" message was logged
+        assert "Found owned file:" in caplog.text
+        assert source_file in caplog.text
 
-    def test_print_deleted_and_created_messages(self, temp_dirs, current_user, capsys):
+    def test_print_deleted_and_created_messages(self, temp_dirs, current_user, caplog):
         """Test that deleted and created symlink messages are printed."""
         source_dir, target_dir = temp_dirs
         username = current_user
@@ -270,13 +289,13 @@ class TestFindAndReplaceOwnedFiles:
             f.write("target")
 
         # Run the function
-        relink.find_and_replace_owned_files(source_dir, target_dir, username)
+        with caplog.at_level(logging.INFO):
+            relink.find_and_replace_owned_files(source_dir, target_dir, username)
 
         # Check messages
-        captured = capsys.readouterr()
-        assert "Deleted original file:" in captured.out
-        assert "Created symbolic link:" in captured.out
-        assert f"{source_file} -> {target_file}" in captured.out
+        assert "Deleted original file:" in caplog.text
+        assert "Created symbolic link:" in caplog.text
+        assert f"{source_file} -> {target_file}" in caplog.text
 
 
 class TestParseArguments:
@@ -387,7 +406,7 @@ class TestEdgeCases:
         assert os.path.islink(source_file)
         assert os.readlink(source_file) == target_file
 
-    def test_error_deleting_file(self, temp_dirs, capsys):
+    def test_error_deleting_file(self, temp_dirs, caplog):
         """Test error message when file deletion fails."""
         source_dir, target_dir = temp_dirs
         username = os.environ["USER"]
@@ -407,14 +426,14 @@ class TestEdgeCases:
 
         with patch("os.rename", side_effect=mock_rename):
             # Run the function
-            relink.find_and_replace_owned_files(source_dir, target_dir, username)
+            with caplog.at_level(logging.INFO):
+                relink.find_and_replace_owned_files(source_dir, target_dir, username)
 
             # Check error message
-            captured = capsys.readouterr()
-            assert "Error deleting file" in captured.out
-            assert source_file in captured.out
+            assert "Error deleting file" in caplog.text
+            assert source_file in caplog.text
 
-    def test_error_creating_symlink(self, temp_dirs, capsys):
+    def test_error_creating_symlink(self, temp_dirs, caplog):
         """Test error message when symlink creation fails."""
         source_dir, target_dir = temp_dirs
         username = os.environ["USER"]
@@ -434,9 +453,9 @@ class TestEdgeCases:
 
         with patch("os.symlink", side_effect=mock_symlink):
             # Run the function
-            relink.find_and_replace_owned_files(source_dir, target_dir, username)
+            with caplog.at_level(logging.INFO):
+                relink.find_and_replace_owned_files(source_dir, target_dir, username)
 
             # Check error message
-            captured = capsys.readouterr()
-            assert "Error creating symlink" in captured.out
-            assert source_file in captured.out
+            assert "Error creating symlink" in caplog.text
+            assert source_file in caplog.text

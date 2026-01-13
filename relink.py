@@ -7,9 +7,13 @@ relative path in a target directory tree.
 import os
 import pwd
 import argparse
+import logging
 
 DEFAULT_SOURCE_ROOT = '/glade/campaign/cesm/cesmdata/cseg/inputdata/'
 DEFAULT_TARGET_ROOT = '/glade/campaign/collections/gdex/data/d651077/cesmdata/inputdata/'
+
+# Set up logger
+logger = logging.getLogger(__name__)
 
 def find_and_replace_owned_files(source_dir, target_dir, username):
     """
@@ -29,10 +33,15 @@ def find_and_replace_owned_files(source_dir, target_dir, username):
     try:
         user_uid = pwd.getpwnam(username).pw_uid
     except KeyError:
-        print(f"Error: User '{username}' not found. Exiting.")
+        logger.error("Error: User '%s' not found. Exiting.", username)
         return
 
-    print(f"Searching for files owned by '{username}' (UID: {user_uid}) in '{source_dir}'...")
+    logger.info(
+        "Searching for files owned by '%s' (UID: %s) in '%s'...",
+        username,
+        user_uid,
+        source_dir
+    )
 
     for dirpath, _, filenames in os.walk(source_dir):
         for filename in filenames:
@@ -41,7 +50,7 @@ def find_and_replace_owned_files(source_dir, target_dir, username):
             # Use os.stat().st_uid to get the file's owner UID
             try:
                 if os.path.islink(file_path):
-                    print(f"Skipping symlink: {file_path}")
+                    logger.info("Skipping symlink: %s", file_path)
                     continue
 
                 file_uid = os.stat(file_path).st_uid
@@ -49,7 +58,7 @@ def find_and_replace_owned_files(source_dir, target_dir, username):
                 continue # Skip if file was deleted during traversal
 
             if file_uid == user_uid:
-                print(f"Found owned file: {file_path}")
+                logger.info("Found owned file: %s", file_path)
 
                 # Determine the relative path and the new link's destination
                 relative_path = os.path.relpath(file_path, source_dir)
@@ -57,7 +66,12 @@ def find_and_replace_owned_files(source_dir, target_dir, username):
 
                 # Check if the target file actually exists
                 if not os.path.exists(link_target):
-                    print(f"Warning: Corresponding file not found in '{target_dir}' for '{file_path}'. Skipping.")
+                    logger.warning(
+                        "Warning: Corresponding file not found in '%s' "
+                        "for '%s'. Skipping.",
+                        target_dir,
+                        file_path
+                    )
                     continue
 
                 # Get the link name
@@ -66,9 +80,9 @@ def find_and_replace_owned_files(source_dir, target_dir, username):
                 # Remove the original file
                 try:
                     os.rename(link_name, link_name+".tmp")
-                    print(f"Deleted original file: {link_name}")
+                    logger.info("Deleted original file: %s", link_name)
                 except OSError as e:
-                    print(f"Error deleting file {link_name}: {e}. Skipping.")
+                    logger.error("Error deleting file %s: %s. Skipping.", link_name, e)
                     continue
 
                 # Create the symbolic link, handling necessary parent directories
@@ -77,10 +91,10 @@ def find_and_replace_owned_files(source_dir, target_dir, username):
                     os.makedirs(os.path.dirname(link_name), exist_ok=True)
                     os.symlink(link_target, link_name)
                     os.remove(link_name+".tmp")
-                    print(f"Created symbolic link: {link_name} -> {link_target}")
+                    logger.info("Created symbolic link: %s -> %s", link_name, link_target)
                 except OSError as e:
                     os.rename(link_name+".tmp", link_name)
-                    print(f"Error creating symlink for {link_name}: {e}. Skipping.")
+                    logger.error("Error creating symlink for %s: %s. Skipping.", link_name, e)
 
 def parse_arguments():
     """
@@ -114,6 +128,14 @@ def parse_arguments():
     return parser.parse_args()
 
 if __name__ == '__main__':
+    # Configure logging to display INFO and above to console (stdout)
+    import sys
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(message)s',
+        stream=sys.stdout
+    )
+    
     # --- Configuration ---
     args = parse_arguments()
     my_username = os.environ['USER']
