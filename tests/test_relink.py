@@ -469,12 +469,14 @@ class TestParseArguments:
 
     def test_timing_flag(self, mock_default_dirs):
         """Test that --timing flag is parsed correctly."""
+        # pylint: disable=unused-argument
         with patch("sys.argv", ["relink.py", "--timing"]):
             args = relink.parse_arguments()
             assert args.timing is True
 
     def test_timing_default(self, mock_default_dirs):
         """Test that timing defaults to False."""
+        # pylint: disable=unused-argument
         with patch("sys.argv", ["relink.py"]):
             args = relink.parse_arguments()
             assert args.timing is False
@@ -483,8 +485,11 @@ class TestParseArguments:
 class TestTiming:
     """Test suite for timing functionality."""
 
-    def test_timing_message_logged(self, tmp_path, caplog):
-        """Test that timing message is logged when timing is enabled."""
+    @pytest.mark.parametrize(
+        "use_timing, should_log_timing", [(True, True), (False, False)]
+    )
+    def test_timing_logging(self, tmp_path, caplog, use_timing, should_log_timing):
+        """Test that timing message is logged only when --timing flag is used."""
         # Create real directories
         source_dir = tmp_path / "source"
         target_dir = tmp_path / "target"
@@ -497,51 +502,28 @@ class TestTiming:
         source_file.write_text("source")
         target_file.write_text("target")
 
-        # Mock sys.argv to simulate running with --timing
+        # Build argv with or without --timing flag
         test_argv = [
             "relink.py",
-            "--source-root", str(source_dir),
-            "--target-root", str(target_dir),
-            "--timing"
+            "--source-root",
+            str(source_dir),
+            "--target-root",
+            str(target_dir),
         ]
+        if use_timing:
+            test_argv.append("--timing")
 
         with patch("sys.argv", test_argv):
             with caplog.at_level(logging.INFO):
                 # Call main() which includes the timing logic
                 relink.main()
 
-        # Verify timing message was logged
-        assert "Execution time:" in caplog.text
-        assert "seconds" in caplog.text
-
-    def test_timing_not_logged_by_default(self, tmp_path, caplog):
-        """Test that timing message is not logged when timing is disabled."""
-        # Create real directories
-        source_dir = tmp_path / "source"
-        target_dir = tmp_path / "target"
-        source_dir.mkdir()
-        target_dir.mkdir()
-
-        # Create a file
-        source_file = source_dir / "test_file.txt"
-        target_file = target_dir / "test_file.txt"
-        source_file.write_text("source")
-        target_file.write_text("target")
-
-        # Mock sys.argv WITHOUT --timing flag
-        test_argv = [
-            "relink.py",
-            "--source-root", str(source_dir),
-            "--target-root", str(target_dir)
-        ]
-
-        with patch("sys.argv", test_argv):
-            with caplog.at_level(logging.INFO):
-                # Call main() without timing flag
-                relink.main()
-
-        # Verify timing message was NOT logged
-        assert "Execution time:" not in caplog.text
+        # Verify timing message presence based on flag
+        if should_log_timing:
+            assert "Execution time:" in caplog.text
+            assert "seconds" in caplog.text
+        else:
+            assert "Execution time:" not in caplog.text
 
 
 class TestDryRun:
