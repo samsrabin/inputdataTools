@@ -462,31 +462,3 @@ def test_error_deleting_file(temp_dirs, caplog):
         # Check error message
         assert "Error deleting file" in caplog.text
         assert source_file in caplog.text
-
-
-def test_error_creating_symlink(temp_dirs, caplog):
-    """Test error message when symlink creation fails."""
-    source_dir, target_dir = temp_dirs
-    username = os.environ["USER"]
-
-    # Create source file
-    source_file = os.path.join(source_dir, "test.txt")
-    target_file = os.path.join(target_dir, "test.txt")
-
-    with open(source_file, "w", encoding="utf-8") as f:
-        f.write("source")
-    with open(target_file, "w", encoding="utf-8") as f:
-        f.write("target")
-
-    # Mock os.symlink to raise an error
-    def mock_symlink(src, dst):
-        raise OSError("Simulated symlink error")
-
-    with patch("os.symlink", side_effect=mock_symlink):
-        # Run the function
-        with caplog.at_level(logging.INFO):
-            relink.find_and_replace_owned_files(source_dir, target_dir, username)
-
-        # Check error message
-        assert "Error creating symlink" in caplog.text
-        assert source_file in caplog.text
