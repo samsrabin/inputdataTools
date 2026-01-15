@@ -188,22 +188,20 @@ def parse_arguments():
             "Find files owned by a user and replace them with symbolic links to a target directory."
         )
     )
+
+    # Source and target directories. Hide from help text because these should only be used for
+    # testing purposes. (That purpose could eventually be replaced with mocked default dirs.)
     parser.add_argument(
         "--source-root",
         type=validate_directory,
         default=DEFAULT_SOURCE_ROOT,
-        help=(
-            f"The root of the directory tree to search for files (default: {DEFAULT_SOURCE_ROOT})"
-        ),
+        help=argparse.SUPPRESS,
     )
     parser.add_argument(
         "--target-root",
         type=validate_directory,
         default=DEFAULT_TARGET_ROOT,
-        help=(
-            f"The root of the directory tree where files should be moved to "
-            f"(default: {DEFAULT_TARGET_ROOT})"
-        ),
+        help=argparse.SUPPRESS,
     )
 
     # Verbosity options (mutually exclusive)
