@@ -1,5 +1,5 @@
 """
-Tests for relink.py script.
+Tests of relink.py --timing option
 """
 
 import os

@@ -1,5 +1,5 @@
 """
-Tests for relink.py script.
+Tests of verbosity levels in relink.py script.
 """
 
 import os

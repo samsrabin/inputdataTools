@@ -1,5 +1,5 @@
 """
-Tests for relink.py script.
+Tests for relink.py --dry-run option.
 """
 
 import os

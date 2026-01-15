@@ -1,5 +1,5 @@
 """
-Tests for relink.py script.
+Tests of find_and_replace_owned_files() in relink.py
 """
 
 import os

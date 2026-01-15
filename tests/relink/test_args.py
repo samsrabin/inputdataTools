@@ -1,5 +1,5 @@
 """
-Tests for relink.py script.
+Tests related to argument parsing and processing in relink.py script.
 """
 
 import os
