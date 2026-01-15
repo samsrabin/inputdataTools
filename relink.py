@@ -19,6 +19,20 @@ DEFAULT_TARGET_ROOT = (
 # Set up logger
 logger = logging.getLogger(__name__)
 
+# Define a custom log level that always prints
+ALWAYS = logging.CRITICAL * 2
+logging.addLevelName(ALWAYS, "ALWAYS")
+
+
+def always(self, message, *args, **kwargs):
+    """Log message that always appears regardless of log level."""
+    if self.isEnabledFor(ALWAYS):
+        # pylint: disable=protected-access
+        self._log(ALWAYS, message, args, **kwargs)
+
+
+logging.Logger.always = always
+
 
 def find_and_replace_owned_files(source_dir, target_dir, username, dry_run=False):
     """
@@ -234,7 +248,7 @@ def main():
 
     if args.timing:
         elapsed_time = time.time() - start_time
-        logger.info("Execution time: %.2f seconds", elapsed_time)
+        logger.always("Execution time: %.2f seconds", elapsed_time)
 
 
 if __name__ == "__main__":
