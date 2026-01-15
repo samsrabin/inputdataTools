@@ -4,8 +4,6 @@ Tests for relink.py script.
 
 import os
 import sys
-import tempfile
-import shutil
 import logging
 from unittest.mock import patch
 
@@ -17,49 +15,6 @@ sys.path.insert(
 )
 # pylint: disable=wrong-import-position
 import relink  # noqa: E402
-
-
-@pytest.fixture(scope="function", autouse=True)
-def configure_logging():
-    """Configure logging to output to stdout for all tests."""
-    # Configure logging before each test
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(message)s",
-        stream=sys.stdout,
-        force=True,  # Force reconfiguration
-    )
-    yield
-    # Clean up logging handlers after each test
-    logging.getLogger().handlers.clear()
-
-
-@pytest.fixture(scope="function", name="mock_default_dirs")
-def fixture_mock_default_dirs():
-    """Mock the default directories to use temporary directories."""
-    source_dir = tempfile.mkdtemp(prefix="test_default_source_")
-    target_dir = tempfile.mkdtemp(prefix="test_default_target_")
-
-    with patch.object(relink, "DEFAULT_SOURCE_ROOT", source_dir):
-        with patch.object(relink, "DEFAULT_TARGET_ROOT", target_dir):
-            yield source_dir, target_dir
-
-    # Cleanup
-    shutil.rmtree(source_dir, ignore_errors=True)
-    shutil.rmtree(target_dir, ignore_errors=True)
-
-
-@pytest.fixture(scope="function", name="temp_dirs")
-def fixture_temp_dirs():
-    """Create temporary source and target directories for testing."""
-    source_dir = tempfile.mkdtemp(prefix="test_source_")
-    target_dir = tempfile.mkdtemp(prefix="test_target_")
-
-    yield source_dir, target_dir
-
-    # Cleanup
-    shutil.rmtree(source_dir, ignore_errors=True)
-    shutil.rmtree(target_dir, ignore_errors=True)
 
 
 @pytest.mark.parametrize(
