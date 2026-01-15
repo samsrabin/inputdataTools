@@ -5,12 +5,9 @@ Tests for relink.py script.
 import os
 import sys
 import tempfile
-import shutil
 import pwd
 import logging
 from unittest.mock import patch
-
-import pytest
 
 # Add parent directory to path to import relink module
 sys.path.insert(
@@ -18,26 +15,6 @@ sys.path.insert(
 )
 # pylint: disable=wrong-import-position
 import relink  # noqa: E402
-
-
-@pytest.fixture(scope="function", name="temp_dirs")
-def fixture_temp_dirs():
-    """Create temporary source and target directories for testing."""
-    source_dir = tempfile.mkdtemp(prefix="test_source_")
-    target_dir = tempfile.mkdtemp(prefix="test_target_")
-
-    yield source_dir, target_dir
-
-    # Cleanup
-    shutil.rmtree(source_dir, ignore_errors=True)
-    shutil.rmtree(target_dir, ignore_errors=True)
-
-
-@pytest.fixture(name="current_user")
-def fixture_current_user():
-    """Get the current user's username."""
-    username = os.environ["USER"]
-    return username
 
 
 def test_basic_file_replacement(temp_dirs, current_user):

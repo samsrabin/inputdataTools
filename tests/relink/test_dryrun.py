@@ -4,8 +4,6 @@ Tests for relink.py script.
 
 import os
 import sys
-import tempfile
-import shutil
 import logging
 
 import pytest
@@ -16,19 +14,6 @@ sys.path.insert(
 )
 # pylint: disable=wrong-import-position
 import relink  # noqa: E402
-
-
-@pytest.fixture(scope="function", name="temp_dirs")
-def fixture_temp_dirs():
-    """Create temporary source and target directories for testing."""
-    source_dir = tempfile.mkdtemp(prefix="test_source_")
-    target_dir = tempfile.mkdtemp(prefix="test_target_")
-
-    yield source_dir, target_dir
-
-    # Cleanup
-    shutil.rmtree(source_dir, ignore_errors=True)
-    shutil.rmtree(target_dir, ignore_errors=True)
 
 
 @pytest.fixture(name="dry_run_setup")
