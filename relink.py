@@ -65,7 +65,7 @@ def find_owned_files_scandir(directory, user_uid):
 
                         # Skip symlinks
                         elif entry.is_symlink():
-                            logger.info("Skipping symlink: %s", entry.path)
+                            logger.debug("Skipping symlink: %s", entry.path)
 
                 except (OSError, PermissionError) as e:
                     logger.debug("Error accessing %s: %s. Skipping.", entry.path, e)

@@ -155,7 +155,7 @@ def test_skip_symlinks(temp_dirs, caplog):
     os.symlink(dummy_target, symlink_path)
 
     # Find owned files with logging
-    with caplog.at_level(logging.INFO):
+    with caplog.at_level(logging.DEBUG):
         found_files = list(relink.find_owned_files_scandir(source_dir, user_uid))
 
     # Verify only regular file was found
