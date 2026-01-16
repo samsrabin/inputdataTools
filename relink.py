@@ -34,6 +34,32 @@ def always(self, message, *args, **kwargs):
 logging.Logger.always = always
 
 
+def handle_non_dir(entry, user_uid):
+    """
+    Check if a non-directory entry is owned by the user and should be processed.
+
+    Args:
+        entry (os.DirEntry): A directory entry from os.scandir().
+        user_uid (int): The UID of the user whose files to find.
+
+    Returns:
+        str or None: The absolute path to the file if it's owned by the user
+                     and is a regular file (not a symlink), otherwise None.
+    """
+    # Is this even owned by the user?
+    if entry.stat(follow_symlinks=False).st_uid == user_uid:
+
+        # Return if it's a file (not following symlinks)
+        if entry.is_file(follow_symlinks=False):
+            return entry.path
+
+        # Log about skipping symlinks
+        if entry.is_symlink():
+            logger.debug("Skipping symlink: %s", entry.path)
+
+    return None
+
+
 def find_owned_files_scandir(directory, user_uid):
     """
     Efficiently find all files owned by a specific user using os.scandir().
@@ -56,16 +82,9 @@ def find_owned_files_scandir(directory, user_uid):
                     if entry.is_dir(follow_symlinks=False):
                         yield from find_owned_files_scandir(entry.path, user_uid)
 
-                    # Is this owned by the user?
-                    elif entry.stat(follow_symlinks=False).st_uid == user_uid:
-
-                        # Return if it's a file (not following symlinks)
-                        if entry.is_file(follow_symlinks=False):
-                            yield entry.path
-
-                        # Skip symlinks
-                        elif entry.is_symlink():
-                            logger.debug("Skipping symlink: %s", entry.path)
+                    # Things other than directories are handled separately
+                    elif (entry_path := handle_non_dir(entry, user_uid)) is not None:
+                        yield entry_path
 
                 except (OSError, PermissionError) as e:
                     logger.debug("Error accessing %s: %s. Skipping.", entry.path, e)
