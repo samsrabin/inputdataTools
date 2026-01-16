@@ -34,7 +34,7 @@ def always(self, message, *args, **kwargs):
 logging.Logger.always = always
 
 
-def handle_non_dir(entry, user_uid):
+def _handle_non_dir_entry(entry, user_uid):
     """
     Check if a non-directory entry is owned by the user and should be processed.
 
@@ -58,6 +58,31 @@ def handle_non_dir(entry, user_uid):
             logger.debug("Skipping symlink: %s", entry.path)
 
     return None
+
+
+def handle_non_dir(var, user_uid):
+    """
+    Check if a non-directory is owned by the user and should be processed. Passes var to a
+    helper function depending on its type.
+
+    Args:
+        var (os.DirEntry or str): A directory entry from os.scandir(), or a string path.
+        user_uid (int): The UID of the user whose files to find.
+
+    Returns:
+        str or None: The absolute path to the file if it's owned by the user
+                     and is a regular file (not a symlink), otherwise None.
+    """
+
+    # Fall back to duck typing: If var has the required DirEntry methods and members, treat it as a
+    # DirEntry. This is necessary for this conditional to work with the MockDirEntry type used in
+    # testing. ("If it looks, walks, and quacks like a duck...")
+    if isinstance(var, os.DirEntry) or all(
+        hasattr(var, m) for m in ["stat", "is_file", "is_symlink", "path"]
+    ):
+        return _handle_non_dir_entry(var, user_uid)
+
+    raise TypeError(f"Unsure how to handle non-directory variable of type {type(var)}")
 
 
 def find_owned_files_scandir(directory, user_uid):
