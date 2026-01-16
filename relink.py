@@ -228,17 +228,23 @@ def replace_files_with_symlinks(
 
 def validate_directory(path):
     """
-    Validate that the path exists and is a directory.
+    Validate that one or more paths exist and are directories.
 
     Args:
-        path (str): The path to validate.
+        path (str or list): The path to validate, or a list of such paths.
 
     Returns:
-        str: The absolute path if valid.
+        str or list: The absolute path(s) if valid.
 
     Raises:
-        argparse.ArgumentTypeError: If path doesn't exist or is not a directory.
+        argparse.ArgumentTypeError: If a path doesn't exist or is not a directory.
     """
+    if isinstance(path, list):
+        result = []
+        for item in path:
+            result.append(validate_directory(item))
+        return result
+
     if not os.path.exists(path):
         raise argparse.ArgumentTypeError(f"Directory '{path}' does not exist")
     if not os.path.isdir(path):
@@ -261,11 +267,10 @@ def parse_arguments():
     )
     parser.add_argument(
         "source_root",
-        nargs="?",
-        type=validate_directory,
+        nargs="*",
         default=DEFAULT_SOURCE_ROOT,
         help=(
-            f"The root of the directory tree to search for files (default: {DEFAULT_SOURCE_ROOT})"
+            f"One or more directories to search for files (default: {DEFAULT_SOURCE_ROOT})"
         ),
     )
     parser.add_argument(
@@ -347,13 +352,14 @@ def main():
     start_time = time.time()
 
     # --- Execution ---
-    replace_files_with_symlinks(
-        args.source_root,
-        args.target_root,
-        my_username,
-        inputdata_root=args.inputdata_root,
-        dry_run=args.dry_run,
-    )
+    for item in args.source_root:
+        replace_files_with_symlinks(
+            item,
+            args.target_root,
+            my_username,
+            inputdata_root=args.inputdata_root,
+            dry_run=args.dry_run,
+        )
 
     if args.timing:
         elapsed_time = time.time() - start_time

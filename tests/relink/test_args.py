@@ -54,7 +54,7 @@ class TestParseArguments:
         custom_source.mkdir()
         with patch("sys.argv", ["relink.py", str(custom_source)]):
             args = relink.parse_arguments()
-            assert args.source_root == str(custom_source.resolve())
+            assert args.source_root == [str(custom_source.resolve())]
             assert args.target_root == target_dir
 
     def test_custom_target_root(self, mock_default_dirs, tmp_path):
@@ -83,7 +83,7 @@ class TestParseArguments:
             ],
         ):
             args = relink.parse_arguments()
-            assert args.source_root == str(source_path.resolve())
+            assert args.source_root == [str(source_path.resolve())]
             assert args.target_root == str(target_path.resolve())
 
     def test_verbose_flag(self, mock_default_dirs):  # pylint: disable=unused-argument
@@ -171,6 +171,49 @@ class TestParseArguments:
             args = relink.parse_arguments()
             assert args.timing is False
 
+    def test_multiple_source_roots(self, mock_default_dirs, tmp_path):
+        """Test that multiple source root arguments are parsed correctly."""
+        _, target_dir = mock_default_dirs
+        source1 = tmp_path / "source1"
+        source2 = tmp_path / "source2"
+        source3 = tmp_path / "source3"
+        source1.mkdir()
+        source2.mkdir()
+        source3.mkdir()
+
+        with patch("sys.argv", ["relink.py", str(source1), str(source2), str(source3)]):
+            args = relink.parse_arguments()
+            assert len(args.source_root) == 3
+            assert str(source1.resolve()) in args.source_root
+            assert str(source2.resolve()) in args.source_root
+            assert str(source3.resolve()) in args.source_root
+            assert args.target_root == target_dir
+
+    def test_multiple_source_roots_with_target(self, tmp_path):
+        """Test multiple source roots with custom target root."""
+        source1 = tmp_path / "source1"
+        source2 = tmp_path / "source2"
+        target = tmp_path / "target"
+        source1.mkdir()
+        source2.mkdir()
+        target.mkdir()
+
+        with patch(
+            "sys.argv",
+            [
+                "relink.py",
+                str(source1),
+                str(source2),
+                "--target-root",
+                str(target),
+            ],
+        ):
+            args = relink.parse_arguments()
+            assert len(args.source_root) == 2
+            assert str(source1.resolve()) in args.source_root
+            assert str(source2.resolve()) in args.source_root
+            assert args.target_root == str(target.resolve())
+
 
 class TestValidateDirectory:
     """Test suite for validate_directory function."""
@@ -231,6 +274,29 @@ class TestValidateDirectory:
         assert result == str(link_dir.absolute())
         # Verify it's still a symlink
         assert os.path.islink(result)
+
+    def test_list_with_invalid_directory(self, tmp_path):
+        """Test that a list with one invalid directory raises error."""
+        dir1 = tmp_path / "dir1"
+        dir1.mkdir()
+        nonexistent = tmp_path / "nonexistent"
+
+        with pytest.raises(argparse.ArgumentTypeError) as exc_info:
+            relink.validate_directory([str(dir1), str(nonexistent)])
+
+        assert "does not exist" in str(exc_info.value)
+
+    def test_list_with_file_instead_of_directory(self, tmp_path):
+        """Test that a list containing a file raises error."""
+        dir1 = tmp_path / "dir1"
+        dir1.mkdir()
+        file1 = tmp_path / "file.txt"
+        file1.write_text("content")
+
+        with pytest.raises(argparse.ArgumentTypeError) as exc_info:
+            relink.validate_directory([str(dir1), str(file1)])
+
+        assert "not a directory" in str(exc_info.value)
 
 
 class TestProcessArgs:
