@@ -21,10 +21,11 @@ import relink  # noqa: E402
 
 
 @pytest.fixture(scope="function", name="mock_default_dirs")
-def fixture_mock_default_dirs():
+def fixture_mock_default_dirs(temp_dirs):
     """Mock the default directories to use temporary directories."""
     source_dir = tempfile.mkdtemp(prefix="test_default_source_")
     target_dir = tempfile.mkdtemp(prefix="test_default_target_")
+    source_dir, target_dir = temp_dirs
 
     with patch.object(relink, "DEFAULT_SOURCE_ROOT", source_dir):
         with patch.object(relink, "DEFAULT_TARGET_ROOT", target_dir):

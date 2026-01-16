@@ -10,6 +10,7 @@ import pwd
 import argparse
 import logging
 import time
+from pathlib import Path
 
 DEFAULT_SOURCE_ROOT = "/glade/campaign/cesm/cesmdata/cseg/inputdata/"
 DEFAULT_TARGET_ROOT = (
@@ -60,7 +61,7 @@ def _handle_non_dir_entry(entry, user_uid):
     return None
 
 
-def handle_non_dir(var, user_uid):
+def handle_non_dir(var, user_uid, inputdata_root):
     """
     Check if a non-directory is owned by the user and should be processed. Passes var to a
     helper function depending on its type.
@@ -68,10 +69,15 @@ def handle_non_dir(var, user_uid):
     Args:
         var (os.DirEntry or str): A directory entry from os.scandir(), or a string path.
         user_uid (int): The UID of the user whose files to find.
+        inputdata_root (str): The root of the directory tree containing CESM input data.
 
     Returns:
         str or None: The absolute path to the file if it's owned by the user
                      and is a regular file (not a symlink), otherwise None.
+
+    Raises:
+        TypeError: If var is not a DirEntry-like object.
+        ValueError: If the file path is not under inputdata_root.
     """
 
     # Fall back to duck typing: If var has the required DirEntry methods and members, treat it as a
@@ -80,12 +86,22 @@ def handle_non_dir(var, user_uid):
     if isinstance(var, os.DirEntry) or all(
         hasattr(var, m) for m in ["stat", "is_file", "is_symlink", "path"]
     ):
-        return _handle_non_dir_entry(var, user_uid)
+        file_path = _handle_non_dir_entry(var, user_uid)
+    else:
+        raise TypeError(
+            f"Unsure how to handle non-directory variable of type {type(var)}"
+        )
 
-    raise TypeError(f"Unsure how to handle non-directory variable of type {type(var)}")
+    # Check that resulting path is a child of inputdata_root
+    if file_path is not None and not Path(file_path).is_relative_to(inputdata_root):
+        raise ValueError(
+            f"'{file_path}' must be equivalent to or under '{inputdata_root}"
+        )
+
+    return file_path
 
 
-def find_owned_files_scandir(directory, user_uid):
+def find_owned_files_scandir(directory, user_uid, inputdata_root=DEFAULT_SOURCE_ROOT):
     """
     Efficiently find all files owned by a specific user using os.scandir().
 
@@ -95,9 +111,13 @@ def find_owned_files_scandir(directory, user_uid):
     Args:
         directory (str): The root directory to search.
         user_uid (int): The UID of the user whose files to find.
+        inputdata_root (str): The root of the directory tree containing CESM input data.
 
     Yields:
         str: Absolute paths to files owned by the user.
+
+    Raises:
+        ValueError: If any file found is not under inputdata_root.
     """
     try:
         with os.scandir(directory) as entries:
@@ -105,10 +125,14 @@ def find_owned_files_scandir(directory, user_uid):
                 try:
                     # Recursively process directories (not following symlinks)
                     if entry.is_dir(follow_symlinks=False):
-                        yield from find_owned_files_scandir(entry.path, user_uid)
+                        yield from find_owned_files_scandir(
+                            entry.path, user_uid, inputdata_root
+                        )
 
                     # Things other than directories are handled separately
-                    elif (entry_path := handle_non_dir(entry, user_uid)) is not None:
+                    elif (
+                        entry_path := handle_non_dir(entry, user_uid, inputdata_root)
+                    ) is not None:
                         yield entry_path
 
                 except (OSError, PermissionError) as e:
@@ -119,7 +143,9 @@ def find_owned_files_scandir(directory, user_uid):
         logger.debug("Error accessing %s: %s. Skipping.", directory, e)
 
 
-def replace_files_with_symlinks(source_dir, target_dir, username, dry_run=False):
+def replace_files_with_symlinks(
+    source_dir, target_dir, username, inputdata_root=DEFAULT_SOURCE_ROOT, dry_run=False
+):
     """
     Finds files owned by a specific user in a source directory tree,
     deletes them, and replaces them with symbolic links to the same
@@ -128,6 +154,7 @@ def replace_files_with_symlinks(source_dir, target_dir, username, dry_run=False)
     Args:
         source_dir (str): The root of the directory tree to search for files.
         target_dir (str): The root of the directory tree containing the new files.
+        inputdata_root (str): The root of the directory tree containing CESM input data.
         username (str): The name of the user whose files will be processed.
         dry_run (bool): If True, only show what would be done without making changes.
     """
@@ -152,7 +179,7 @@ def replace_files_with_symlinks(source_dir, target_dir, username, dry_run=False)
     )
 
     # Use efficient scandir-based search
-    for file_path in find_owned_files_scandir(source_dir, user_uid):
+    for file_path in find_owned_files_scandir(source_dir, user_uid, inputdata_root):
         logger.info("Found owned file: %s", file_path)
 
         # Determine the relative path and the new link's destination
@@ -251,6 +278,16 @@ def parse_arguments():
         ),
     )
 
+    # The root of the directory tree containing CESM input data.
+    # ONLY INTENDED FOR USE IN TESTING
+    parser.add_argument(
+        "--inputdata-root",
+        "-inputdata",  # to match rimport
+        type=validate_directory,
+        default=DEFAULT_SOURCE_ROOT,
+        help=argparse.SUPPRESS,
+    )
+
     # Verbosity options (mutually exclusive)
     verbosity_group = parser.add_mutually_exclusive_group()
     verbosity_group.add_argument(
@@ -311,7 +348,11 @@ def main():
 
     # --- Execution ---
     replace_files_with_symlinks(
-        args.source_root, args.target_root, my_username, dry_run=args.dry_run
+        args.source_root,
+        args.target_root,
+        my_username,
+        inputdata_root=args.inputdata_root,
+        dry_run=args.dry_run,
     )
 
     if args.timing:

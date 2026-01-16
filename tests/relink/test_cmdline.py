@@ -44,6 +44,8 @@ def test_command_line_execution_dry_run(mock_dirs):
         "--target-root",
         str(target_dir),
         "--dry-run",
+        "--inputdata-root",
+        str(source_dir),
     ]
 
     # Execute the command
@@ -78,6 +80,8 @@ def test_command_line_execution_actual_run(mock_dirs):
         str(source_dir),
         "--target-root",
         str(target_dir),
+        "-inputdata",
+        str(source_dir),
     ]
 
     # Execute the command

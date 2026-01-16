@@ -7,6 +7,7 @@ import tempfile
 import shutil
 
 import pytest
+from unittest.mock import patch
 
 
 @pytest.fixture(scope="function", name="temp_dirs")
@@ -15,7 +16,8 @@ def fixture_temp_dirs():
     source_dir = tempfile.mkdtemp(prefix="test_source_")
     target_dir = tempfile.mkdtemp(prefix="test_target_")
 
-    yield source_dir, target_dir
+    with patch("relink.DEFAULT_SOURCE_ROOT", source_dir):
+        yield source_dir, target_dir
 
     # Cleanup
     shutil.rmtree(source_dir, ignore_errors=True)

@@ -103,7 +103,9 @@ def test_find_owned_files_basic(temp_dirs):
         f.write("content2")
 
     # Find owned files
-    found_files = list(relink.find_owned_files_scandir(source_dir, user_uid))
+    found_files = list(
+        relink.find_owned_files_scandir(source_dir, user_uid, inputdata_root=source_dir)
+    )
 
     # Verify both files were found
     assert len(found_files) == 2
@@ -130,7 +132,9 @@ def test_find_owned_files_nested(temp_dirs):
             fp.write("content")
 
     # Find owned files
-    found_files = list(relink.find_owned_files_scandir(source_dir, user_uid))
+    found_files = list(
+        relink.find_owned_files_scandir(source_dir, user_uid, inputdata_root=source_dir)
+    )
 
     # Verify all files were found
     assert len(found_files) == 3
@@ -156,7 +160,11 @@ def test_skip_symlinks(temp_dirs, caplog):
 
     # Find owned files with logging
     with caplog.at_level(logging.DEBUG):
-        found_files = list(relink.find_owned_files_scandir(source_dir, user_uid))
+        found_files = list(
+            relink.find_owned_files_scandir(
+                source_dir, user_uid, inputdata_root=source_dir
+            )
+        )
 
     # Verify only regular file was found
     assert len(found_files) == 1
@@ -197,7 +205,11 @@ def test_skip_symlinks_owned_by_different_user(temp_dirs, caplog):
 
     with patch("os.scandir", side_effect=mock_scandir):
         with caplog.at_level(logging.INFO):
-            found_files = list(relink.find_owned_files_scandir(source_dir, user_uid))
+            found_files = list(
+                relink.find_owned_files_scandir(
+                    source_dir, user_uid, inputdata_root=source_dir
+                )
+            )
 
     # Verify only regular file was found
     assert len(found_files) == 1
@@ -216,7 +228,9 @@ def test_empty_directory(temp_dirs):
     user_uid = os.stat(source_dir).st_uid
 
     # Find owned files in empty directory
-    found_files = list(relink.find_owned_files_scandir(source_dir, user_uid))
+    found_files = list(
+        relink.find_owned_files_scandir(source_dir, user_uid, inputdata_root=source_dir)
+    )
 
     # Should return empty list
     assert len(found_files) == 0
@@ -245,7 +259,11 @@ def test_permission_error_handling(temp_dirs, caplog):
     try:
         # Find owned files with debug logging
         with caplog.at_level(logging.DEBUG):
-            found_files = list(relink.find_owned_files_scandir(source_dir, user_uid))
+            found_files = list(
+                relink.find_owned_files_scandir(
+                    source_dir, user_uid, inputdata_root=source_dir
+                )
+            )
 
         # Should find the accessible file but skip the inaccessible directory
         assert file1 in found_files
@@ -272,7 +290,9 @@ def test_only_files_not_directories(temp_dirs):
     os.makedirs(subdir)
 
     # Find owned files
-    found_files = list(relink.find_owned_files_scandir(source_dir, user_uid))
+    found_files = list(
+        relink.find_owned_files_scandir(source_dir, user_uid, inputdata_root=source_dir)
+    )
 
     # Should only find the file, not the directory
     assert len(found_files) == 1
@@ -303,7 +323,11 @@ def test_does_not_follow_symlink_directories(temp_dirs):
         os.symlink(external_dir, symlink_dir)
 
         # Find owned files
-        found_files = list(relink.find_owned_files_scandir(source_dir, user_uid))
+        found_files = list(
+            relink.find_owned_files_scandir(
+                source_dir, user_uid, inputdata_root=source_dir
+            )
+        )
 
         # Should find file in real directory but not in symlinked directory
         assert file_in_real in found_files

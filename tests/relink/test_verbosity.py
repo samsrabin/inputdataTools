@@ -37,7 +37,9 @@ def test_quiet_mode_suppresses_info_messages(temp_dirs, caplog):
 
     # Run the function with WARNING level (quiet mode)
     with caplog.at_level(logging.WARNING):
-        relink.replace_files_with_symlinks(source_dir, target_dir, username)
+        relink.replace_files_with_symlinks(
+            source_dir, target_dir, username, inputdata_root=source_dir
+        )
 
     # Verify INFO messages are NOT in the log
     assert "Searching for files owned by" not in caplog.text
@@ -59,7 +61,9 @@ def test_quiet_mode_shows_warnings(temp_dirs, caplog):
 
     # Run the function with WARNING level (quiet mode)
     with caplog.at_level(logging.WARNING):
-        relink.replace_files_with_symlinks(source_dir, target_dir, username)
+        relink.replace_files_with_symlinks(
+            source_dir, target_dir, username, inputdata_root=source_dir
+        )
 
     # Verify WARNING message IS in the log
     assert "Warning: Corresponding file not found" in caplog.text
@@ -73,7 +77,9 @@ def test_quiet_mode_shows_errors(temp_dirs, caplog):
     # Test 1: Invalid username error
     invalid_username = "nonexistent_user_12345"
     with caplog.at_level(logging.WARNING):
-        relink.replace_files_with_symlinks(source_dir, target_dir, invalid_username)
+        relink.replace_files_with_symlinks(
+            source_dir, target_dir, invalid_username, inputdata_root=source_dir
+        )
     assert "Error: User" in caplog.text
     assert "not found" in caplog.text
 
@@ -94,7 +100,9 @@ def test_quiet_mode_shows_errors(temp_dirs, caplog):
 
     with patch("os.rename", side_effect=mock_rename):
         with caplog.at_level(logging.WARNING):
-            relink.replace_files_with_symlinks(source_dir, target_dir, username)
+            relink.replace_files_with_symlinks(
+                source_dir, target_dir, username, inputdata_root=source_dir
+            )
         assert "Error deleting file" in caplog.text
 
     # Clear the log for next test
@@ -114,5 +122,7 @@ def test_quiet_mode_shows_errors(temp_dirs, caplog):
 
     with patch("os.symlink", side_effect=mock_symlink):
         with caplog.at_level(logging.WARNING):
-            relink.replace_files_with_symlinks(source_dir, target_dir, username)
+            relink.replace_files_with_symlinks(
+                source_dir, target_dir, username, inputdata_root=source_dir
+            )
         assert "Error creating symlink" in caplog.text
