@@ -382,7 +382,7 @@ class TestHandleNonDir:
         # Get DirEntry for the file
         with os.scandir(source_dir) as entries:
             entry = next(e for e in entries if e.name == "test.txt")
-            result = relink.handle_non_dir(entry, user_uid, source_dir)
+            result = relink.handle_non_dir(entry, user_uid)
 
         assert result == test_file
 
@@ -397,7 +397,7 @@ class TestHandleNonDir:
             f.write("content")
 
         # Get path of the file
-        result = relink.handle_non_dir(test_file, user_uid, source_dir)
+        result = relink.handle_non_dir(test_file, user_uid)
 
         assert result == test_file
 
@@ -412,7 +412,7 @@ class TestHandleNonDir:
 
         # Get path of the file
         with pytest.raises(FileNotFoundError):
-            relink.handle_non_dir(test_file, user_uid, source_dir)
+            relink.handle_non_dir(test_file, user_uid)
 
     def test_raises_typeerror_for_int(self, temp_dirs):
         """Test that handle_non_dir raises TypeError for an integer."""
@@ -426,4 +426,4 @@ class TestHandleNonDir:
             TypeError,
             match=f"Unsure how to handle non-directory variable of type.*{expected_type}",
         ):
-            relink.handle_non_dir(invalid_input, user_uid, source_dir)
+            relink.handle_non_dir(invalid_input, user_uid)

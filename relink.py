@@ -93,7 +93,7 @@ def _handle_non_dir_str(path: str, user_uid: int):
     return None
 
 
-def handle_non_dir(var, user_uid, inputdata_root):
+def handle_non_dir(var, user_uid):
     """
     Check if a non-directory is owned by the user and should be processed. Passes var to a
     helper function depending on its type.
@@ -101,7 +101,6 @@ def handle_non_dir(var, user_uid, inputdata_root):
     Args:
         var (os.DirEntry or str): A directory entry from os.scandir(), or a string path.
         user_uid (int): The UID of the user whose files to find.
-        inputdata_root (str): The root of the directory tree containing CESM input data.
 
     Returns:
         str or None: The absolute path to the file if it's owned by the user
@@ -109,7 +108,6 @@ def handle_non_dir(var, user_uid, inputdata_root):
 
     Raises:
         TypeError: If var is not a DirEntry-like object.
-        ValueError: If the file path is not under inputdata_root.
     """
 
     # Handle a variable of type str.
@@ -128,12 +126,6 @@ def handle_non_dir(var, user_uid, inputdata_root):
     else:
         raise TypeError(
             f"Unsure how to handle non-directory variable of type {type(var)}"
-        )
-
-    # Check that resulting path is a child of inputdata_root
-    if file_path is not None and not Path(file_path).is_relative_to(inputdata_root):
-        raise ValueError(
-            f"'{file_path}' must be equivalent to or under '{inputdata_root}"
         )
 
     return file_path
@@ -169,7 +161,7 @@ def find_owned_files_scandir(item, user_uid, inputdata_root=DEFAULT_SOURCE_ROOT)
 
                     # Things other than directories are handled separately
                     elif (
-                        entry_path := handle_non_dir(entry, user_uid, inputdata_root)
+                        entry_path := handle_non_dir(entry, user_uid)
                     ) is not None:
                         yield entry_path
 
@@ -178,7 +170,7 @@ def find_owned_files_scandir(item, user_uid, inputdata_root=DEFAULT_SOURCE_ROOT)
                     continue
 
     except NotADirectoryError:
-        if (file_path := handle_non_dir(item, user_uid, inputdata_root)) is not None:
+        if (file_path := handle_non_dir(item, user_uid)) is not None:
             yield file_path
 
     except (OSError, PermissionError) as e:
