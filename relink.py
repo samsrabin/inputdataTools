@@ -111,11 +111,9 @@ def handle_non_dir(var, user_uid, inputdata_root):
         TypeError: If var is not a DirEntry-like object.
         ValueError: If the file path is not under inputdata_root.
     """
-    logger.debug("starting handle_non_dir()")
 
     # Handle a variable of type str.
     if isinstance(var, str):
-        logger.debug("isinstance(var, str)")
         file_path = _handle_non_dir_str(var, user_uid)
 
     # Handle a variable of type like os.DirEntry.
@@ -184,7 +182,7 @@ def find_owned_files_scandir(item, user_uid, inputdata_root=DEFAULT_SOURCE_ROOT)
             yield file_path
 
     except (OSError, PermissionError) as e:
-        logger.warning("Error accessing %s: %s. Skipping.", item, e)
+        logger.error("Error accessing %s: %s. Skipping.", item, e)
 
 
 def replace_files_with_symlinks(
