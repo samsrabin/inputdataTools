@@ -176,7 +176,7 @@ def find_owned_files_scandir(item, user_uid, inputdata_root=DEFAULT_SOURCE_ROOT)
                         yield entry_path
 
                 except (OSError, PermissionError) as e:
-                    logger.debug("Error accessing %s: %s. Skipping.", entry.path, e)
+                    logger.error("Error accessing %s: %s. Skipping.", entry.path, e)
                     continue
 
     except NotADirectoryError:
