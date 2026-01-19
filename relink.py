@@ -180,50 +180,66 @@ def replace_files_with_symlinks(
 
     # Use efficient scandir-based search
     for file_path in find_owned_files_scandir(source_dir, user_uid, inputdata_root):
-        logger.info("Found owned file: %s", file_path)
+        replace_one_file_with_symlink(source_dir, target_dir, file_path, dry_run=dry_run)
 
-        # Determine the relative path and the new link's destination
-        relative_path = os.path.relpath(file_path, source_dir)
-        link_target = os.path.join(target_dir, relative_path)
 
-        # Check if the target file actually exists
-        if not os.path.exists(link_target):
-            logger.warning(
-                "Warning: Corresponding file not found in '%s' for '%s'. Skipping.",
-                target_dir,
-                file_path,
-            )
-            continue
+def replace_one_file_with_symlink(
+    source_dir, target_dir, file_path, dry_run=False
+):
+    """
+    Given a file, replaces it with a symbolic link to the same relative path in a target directory
+    tree.
 
-        # Get the link name
-        link_name = file_path
+    Args:
+        source_dir (str): The root of the directory tree to search for files.
+        target_dir (str): The root of the directory tree containing the new files.
+        file_path (str): The path of the file to be replaced.
+        dry_run (bool): If True, only show what would be done without making changes.
+    """
+    logger.info("Found owned file: %s", file_path)
 
-        if dry_run:
-            logger.info(
-                "[DRY RUN] Would create symbolic link: %s -> %s",
-                link_name,
-                link_target,
-            )
-            continue
+    # Determine the relative path and the new link's destination
+    relative_path = os.path.relpath(file_path, source_dir)
+    link_target = os.path.join(target_dir, relative_path)
 
-        # Remove the original file
-        try:
-            os.rename(link_name, link_name + ".tmp")
-            logger.info("Deleted original file: %s", link_name)
-        except OSError as e:
-            logger.error("Error deleting file %s: %s. Skipping.", link_name, e)
-            continue
+    # Check if the target file actually exists
+    if not os.path.exists(link_target):
+        logger.warning(
+            "Warning: Corresponding file not found in '%s' for '%s'. Skipping.",
+            target_dir,
+            file_path,
+        )
+        return
 
-        # Create the symbolic link, handling necessary parent directories
-        try:
-            # Create parent directories for the link if they don't exist
-            os.makedirs(os.path.dirname(link_name), exist_ok=True)
-            os.symlink(link_target, link_name)
-            os.remove(link_name + ".tmp")
-            logger.info("Created symbolic link: %s -> %s", link_name, link_target)
-        except OSError as e:
-            os.rename(link_name + ".tmp", link_name)
-            logger.error("Error creating symlink for %s: %s. Skipping.", link_name, e)
+    # Get the link name
+    link_name = file_path
+
+    if dry_run:
+        logger.info(
+            "[DRY RUN] Would create symbolic link: %s -> %s",
+            link_name,
+            link_target,
+        )
+        return
+
+    # Remove the original file
+    try:
+        os.rename(link_name, link_name + ".tmp")
+        logger.info("Deleted original file: %s", link_name)
+    except OSError as e:
+        logger.error("Error deleting file %s: %s. Skipping.", link_name, e)
+        return
+
+    # Create the symbolic link, handling necessary parent directories
+    try:
+        # Create parent directories for the link if they don't exist
+        os.makedirs(os.path.dirname(link_name), exist_ok=True)
+        os.symlink(link_target, link_name)
+        os.remove(link_name + ".tmp")
+        logger.info("Created symbolic link: %s -> %s", link_name, link_target)
+    except OSError as e:
+        os.rename(link_name + ".tmp", link_name)
+        logger.error("Error creating symlink for %s: %s. Skipping.", link_name, e)
 
 
 def validate_directory(path):
