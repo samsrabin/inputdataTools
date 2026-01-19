@@ -66,7 +66,8 @@ def test_quiet_mode_shows_warnings(temp_dirs, caplog):
         )
 
     # Verify WARNING message IS in the log
-    assert "Warning: Corresponding file not found" in caplog.text
+    assert "Warning: Corresponding file" in caplog.text
+    assert "not found" in caplog.text
 
 
 def test_quiet_mode_shows_errors(temp_dirs, caplog):

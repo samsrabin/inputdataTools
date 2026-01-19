@@ -59,6 +59,54 @@ def fixture_mock_direntry():
     return _create_mock
 
 
+@pytest.fixture(name="mock_stat_with_different_uid")
+def fixture_mock_stat_with_different_uid():
+    """
+    Factory fixture to create a mock os.stat function that returns different UID for specific files.
+
+    Returns:
+        callable: A function that creates a mock stat function.
+    """
+
+    def _create_mock_stat(file_path, different_uid):
+        """
+        Create a mock stat function that returns different UID for a specific file.
+
+        Args:
+            file_path (str): The path to the file that should have different UID.
+            different_uid (int): The UID to return for that file.
+
+        Returns:
+            callable: A function that can be used with patch("os.stat", side_effect=...)
+        """
+        original_stat = os.stat
+
+        def mock_stat(path, *args, **kwargs):
+            stat_result = original_stat(path, *args, **kwargs)
+            if path == file_path:
+                # Create modified stat result with different UID
+                modified_stat = os.stat_result(
+                    (
+                        stat_result.st_mode,
+                        stat_result.st_ino,
+                        stat_result.st_dev,
+                        stat_result.st_nlink,
+                        different_uid,  # Different UID
+                        stat_result.st_gid,
+                        stat_result.st_size,
+                        stat_result.st_atime,
+                        stat_result.st_mtime,
+                        stat_result.st_ctime,
+                    )
+                )
+                return modified_stat
+            return stat_result
+
+        return mock_stat
+
+    return _create_mock_stat
+
+
 class TestHandleNonDirEntry:
     """
     Tests for _handle_non_dir_entry() function.
@@ -187,6 +235,137 @@ class TestHandleNonDirEntry:
         assert result == test_file
 
 
+class TestHandleNonDirStr:
+    """
+    Tests for _handle_non_dir_str() function.
+
+    TODO: Logging tests are in test_verbosity.py.
+    """
+
+    def test_returns_path_for_owned_regular_file(self, temp_dirs):
+        """Test that owned regular files return their path."""
+        source_dir, _ = temp_dirs
+        user_uid = os.stat(source_dir).st_uid
+
+        # Create a regular file
+        test_file = os.path.join(source_dir, "test.txt")
+        with open(test_file, "w", encoding="utf-8") as f:
+            f.write("content")
+
+        # Get path of the file
+        result = relink._handle_non_dir_str(test_file, user_uid)
+
+        assert result == test_file
+
+    def test_returns_none_for_file_owned_by_different_user(
+        self, temp_dirs, mock_stat_with_different_uid
+    ):
+        """Test that files owned by different users return None."""
+        source_dir, _ = temp_dirs
+        user_uid = os.stat(source_dir).st_uid
+        different_uid = user_uid + 1000
+
+        # Create a file
+        test_file = os.path.join(source_dir, "test.txt")
+        with open(test_file, "w", encoding="utf-8") as f:
+            f.write("content")
+
+        # Create mock stat function
+        mock_stat = mock_stat_with_different_uid(test_file, different_uid)
+
+        with patch("os.stat", side_effect=mock_stat):
+            result = relink._handle_non_dir_str(test_file, user_uid)
+
+        assert result is None
+
+    def test_returns_none_and_logs_for_owned_symlink(self, temp_dirs, caplog):
+        """Test that owned symlinks return None and are logged."""
+        source_dir, _ = temp_dirs
+        user_uid = os.stat(source_dir).st_uid
+
+        # Create a symlink
+        symlink_path = os.path.join(source_dir, "link.txt")
+        dummy_target = os.path.join(tempfile.gettempdir(), "somewhere")
+        os.symlink(dummy_target, symlink_path)
+
+        # Get path of the symlink
+        with caplog.at_level(logging.DEBUG):
+            result = relink._handle_non_dir_str(symlink_path, user_uid)
+
+        assert result is None
+        assert "Skipping symlink:" in caplog.text
+        assert symlink_path in caplog.text
+
+    def test_returns_none_for_symlink_owned_by_different_user(
+        self, temp_dirs, caplog, mock_stat_with_different_uid
+    ):
+        """Test that symlinks owned by different users return None without logging."""
+        source_dir, _ = temp_dirs
+        user_uid = os.stat(source_dir).st_uid
+        different_uid = user_uid + 1000
+
+        # Create a symlink
+        symlink_path = os.path.join(source_dir, "link.txt")
+        dummy_target = os.path.join(tempfile.gettempdir(), "somewhere")
+        os.symlink(dummy_target, symlink_path)
+
+        # Create mock stat function
+        mock_stat = mock_stat_with_different_uid(symlink_path, different_uid)
+
+        with patch("os.stat", side_effect=mock_stat):
+            with caplog.at_level(logging.DEBUG):
+                result = relink._handle_non_dir_str(symlink_path, user_uid)
+
+        assert result is None
+        # Should NOT log because it's not owned by the user
+        assert "Skipping symlink:" not in caplog.text
+
+    def test_handles_file_with_spaces(self, temp_dirs):
+        """Test that files with spaces in names are handled correctly."""
+        source_dir, _ = temp_dirs
+        user_uid = os.stat(source_dir).st_uid
+
+        # Create a file with spaces
+        test_file = os.path.join(source_dir, "file with spaces.txt")
+        with open(test_file, "w", encoding="utf-8") as f:
+            f.write("content")
+
+        # Get path of the file
+        result = relink._handle_non_dir_str(test_file, user_uid)
+
+        assert result == test_file
+
+    def test_handles_file_with_special_characters(self, temp_dirs):
+        """Test that files with special characters are handled correctly."""
+        source_dir, _ = temp_dirs
+        user_uid = os.stat(source_dir).st_uid
+
+        # Create a file with special characters
+        filename = "file-with_special.chars@123.txt"
+        test_file = os.path.join(source_dir, filename)
+        with open(test_file, "w", encoding="utf-8") as f:
+            f.write("content")
+
+        # Get path of the file
+        result = relink._handle_non_dir_str(test_file, user_uid)
+
+        assert result == test_file
+
+    def test_error_file_doesnt_exist(self, temp_dirs):
+        """Test that error is thrown if file doesn't exist."""
+        source_dir, _ = temp_dirs
+        user_uid = os.stat(source_dir).st_uid
+
+        # Create a file name that doesn't exist
+        filename = "filename.txt"
+        test_file = os.path.join(source_dir, filename)
+        assert not os.path.exists(test_file)
+
+        # Get path of the file
+        with pytest.raises(FileNotFoundError):
+            relink._handle_non_dir_str(test_file, user_uid)
+
+
 class TestHandleNonDir:
     """Tests for handle_non_dir() function."""
 
@@ -206,6 +385,34 @@ class TestHandleNonDir:
             result = relink.handle_non_dir(entry, user_uid, source_dir)
 
         assert result == test_file
+
+    def test_works_with_str(self, temp_dirs):
+        """Test that handle_non_dir works with strings."""
+        source_dir, _ = temp_dirs
+        user_uid = os.stat(source_dir).st_uid
+
+        # Create a regular file
+        test_file = os.path.join(source_dir, "test.txt")
+        with open(test_file, "w", encoding="utf-8") as f:
+            f.write("content")
+
+        # Get path of the file
+        result = relink.handle_non_dir(test_file, user_uid, source_dir)
+
+        assert result == test_file
+
+    def test_errors_with_str_file_doesnt_exist(self, temp_dirs):
+        """Test that handle_non_dir throws error if given string pointing to nonexistent file."""
+        source_dir, _ = temp_dirs
+        user_uid = os.stat(source_dir).st_uid
+
+        # Create a file name that doesn't exist
+        test_file = "filename.txt"
+        assert not os.path.exists(test_file)
+
+        # Get path of the file
+        with pytest.raises(FileNotFoundError):
+            relink.handle_non_dir(test_file, user_uid, source_dir)
 
     def test_raises_typeerror_for_int(self, temp_dirs):
         """Test that handle_non_dir raises TypeError for an integer."""

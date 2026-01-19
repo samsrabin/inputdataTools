@@ -27,7 +27,7 @@ class TestParseArguments:
         source_dir, target_dir = temp_dirs
         with patch("sys.argv", ["relink.py", source_dir]):
             args = relink.parse_arguments()
-            assert args.source_root == [source_dir]
+            assert args.items_to_process == [source_dir]
             assert args.target_root == target_dir
 
     def test_custom_source_root(self, temp_dirs):
@@ -37,7 +37,7 @@ class TestParseArguments:
         custom_source.mkdir()
         with patch("sys.argv", ["relink.py", str(custom_source)]):
             args = relink.parse_arguments()
-            assert args.source_root == [str(custom_source.resolve())]
+            assert args.items_to_process == [str(custom_source.resolve())]
             assert args.target_root == target_dir
 
     def test_custom_target_root(self, temp_dirs):
@@ -47,7 +47,7 @@ class TestParseArguments:
         custom_target.mkdir()
         with patch("sys.argv", ["relink.py", "--target-root", str(custom_target)]):
             args = relink.parse_arguments()
-            assert args.source_root == [source_dir]
+            assert args.items_to_process == [source_dir]
             assert args.target_root == str(custom_target.resolve())
 
     def test_both_custom_paths(self, temp_dirs):
@@ -67,7 +67,7 @@ class TestParseArguments:
             ],
         ):
             args = relink.parse_arguments()
-            assert args.source_root == [str(source_dir.resolve())]
+            assert args.items_to_process == [str(source_dir.resolve())]
             assert args.target_root == str(target_dir.resolve())
 
     def test_verbose_flag(self, temp_dirs):  # pylint: disable=unused-argument
@@ -161,10 +161,10 @@ class TestParseArguments:
 
         with patch("sys.argv", ["relink.py", str(source1), str(source2), str(source3)]):
             args = relink.parse_arguments()
-            assert len(args.source_root) == 3
-            assert str(source1.resolve()) in args.source_root
-            assert str(source2.resolve()) in args.source_root
-            assert str(source3.resolve()) in args.source_root
+            assert len(args.items_to_process) == 3
+            assert str(source1.resolve()) in args.items_to_process
+            assert str(source2.resolve()) in args.items_to_process
+            assert str(source3.resolve()) in args.items_to_process
             assert args.target_root == target_dir
 
     def test_multiple_source_roots_with_target(self, temp_dirs):
@@ -188,9 +188,9 @@ class TestParseArguments:
             ],
         ):
             args = relink.parse_arguments()
-            assert len(args.source_root) == 2
-            assert str(source1.resolve()) in args.source_root
-            assert str(source2.resolve()) in args.source_root
+            assert len(args.items_to_process) == 2
+            assert str(source1.resolve()) in args.items_to_process
+            assert str(source2.resolve()) in args.items_to_process
             assert args.target_root == str(target.resolve())
 
 
@@ -215,16 +215,6 @@ class TestValidateDirectory:
         assert "does not exist" in str(exc_info.value)
         assert nonexistent in str(exc_info.value)
 
-    def test_file_instead_of_directory(self, tmp_path):
-        """Test that a file path raises ArgumentTypeError."""
-        test_file = tmp_path / "test_file.txt"
-        test_file.write_text("content")
-
-        with pytest.raises(argparse.ArgumentTypeError) as exc_info:
-            relink.validate_directory(str(test_file))
-
-        assert "not a directory" in str(exc_info.value)
-
     def test_relative_path_converted_to_absolute(self, tmp_path):
         """Test that relative paths are converted to absolute."""
         test_dir = tmp_path / "relative_test"
@@ -248,7 +238,7 @@ class TestValidateDirectory:
         link_dir = tmp_path / "link_dir"
         link_dir.symlink_to(real_dir)
 
-        result = relink.validate_directory(str(link_dir))
+        result = relink.validate_paths(str(link_dir))
         # validate_directory returns absolute path of the symlink itself
         assert result == str(link_dir.absolute())
         # Verify it's still a symlink
@@ -261,21 +251,87 @@ class TestValidateDirectory:
         nonexistent = tmp_path / "nonexistent"
 
         with pytest.raises(argparse.ArgumentTypeError) as exc_info:
-            relink.validate_directory([str(dir1), str(nonexistent)])
+            relink.validate_paths([str(dir1), str(nonexistent)])
+
+        assert "does not exist" in str(exc_info.value)
+
+
+class TestValidatePaths:
+    """Test suite for validate_paths function."""
+
+    def test_valid_directory(self, tmp_path):
+        """Test that valid directory is accepted and returns absolute path."""
+        test_dir = tmp_path / "valid_dir"
+        test_dir.mkdir()
+
+        result = relink.validate_paths(str(test_dir))
+        assert result == str(test_dir.resolve())
+
+    def test_nonexistent_directory(self):
+        """Test that nonexistent directory raises ArgumentTypeError."""
+        nonexistent = os.path.join(os.sep, "nonexistent", "directory", "12345")
+
+        with pytest.raises(argparse.ArgumentTypeError) as exc_info:
+            relink.validate_paths(nonexistent)
+
+        assert "does not exist" in str(exc_info.value)
+        assert nonexistent in str(exc_info.value)
+
+    def test_file_instead_of_directory(self, tmp_path):
+        """Test that a file path doesn't raise ArgumentTypeError (or any error)."""
+        test_file = tmp_path / "test_file.txt"
+        test_file.write_text("content")
+
+        relink.validate_paths(str(test_file))
+
+    def test_relative_path_converted_to_absolute(self, tmp_path):
+        """Test that relative paths are converted to absolute."""
+        test_dir = tmp_path / "relative_test"
+        test_dir.mkdir()
+
+        # Change to parent directory and use relative path
+        cwd = os.getcwd()
+        try:
+            os.chdir(str(tmp_path))
+            result = relink.validate_paths("relative_test")
+            assert os.path.isabs(result)
+            assert result == str(test_dir.resolve())
+        finally:
+            os.chdir(cwd)
+
+    def test_symlink_to_directory(self, tmp_path):
+        """Test that symlink to a directory is accepted."""
+        real_dir = tmp_path / "real_dir"
+        real_dir.mkdir()
+
+        link_dir = tmp_path / "link_dir"
+        link_dir.symlink_to(real_dir)
+
+        result = relink.validate_paths(str(link_dir))
+        # validate_directory returns absolute path of the symlink itself
+        assert result == str(link_dir.absolute())
+        # Verify it's still a symlink
+        assert os.path.islink(result)
+
+    def test_list_with_invalid_directory(self, tmp_path):
+        """Test that a list with one invalid directory raises error."""
+        dir1 = tmp_path / "dir1"
+        dir1.mkdir()
+        nonexistent = tmp_path / "nonexistent"
+
+        with pytest.raises(argparse.ArgumentTypeError) as exc_info:
+            relink.validate_paths([str(dir1), str(nonexistent)])
 
         assert "does not exist" in str(exc_info.value)
 
     def test_list_with_file_instead_of_directory(self, tmp_path):
-        """Test that a list containing a file raises error."""
+        """Test that a list containing a file doesn't raise error."""
         dir1 = tmp_path / "dir1"
         dir1.mkdir()
         file1 = tmp_path / "file.txt"
         file1.write_text("content")
 
-        with pytest.raises(argparse.ArgumentTypeError) as exc_info:
-            relink.validate_directory([str(dir1), str(file1)])
-
-        assert "not a directory" in str(exc_info.value)
+        relink.validate_paths([str(dir1), str(file1)])
 
 
 class TestProcessArgs:
@@ -313,7 +369,10 @@ class TestProcessArgs:
     def test_error_if_source_not_in_inputdata(self):
         """Test that process_args errors if source isn't in inputdata_root."""
         args = argparse.Namespace(
-            quiet=False, verbose=False, source_root="abc123", inputdata_root="def456"
+            quiet=False,
+            verbose=False,
+            items_to_process="abc123",
+            inputdata_root="def456",
         )
         with pytest.raises(argparse.ArgumentTypeError) as exc_info:
             relink.process_args(args)

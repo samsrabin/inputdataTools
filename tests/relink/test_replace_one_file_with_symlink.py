@@ -83,7 +83,8 @@ def test_missing_target_file(temp_dirs, caplog):
     assert os.path.isfile(source_file), "Original file should still exist"
 
     # Check warning message
-    assert "Warning: Corresponding file not found" in caplog.text
+    assert "Warning: Corresponding file " in caplog.text
+    assert " not found" in caplog.text
 
 
 def test_absolute_paths(temp_dirs):

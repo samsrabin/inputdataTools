@@ -9,6 +9,8 @@ import logging
 from unittest.mock import patch
 from contextlib import contextmanager
 
+import pytest
+
 # Add parent directory to path to import relink module
 sys.path.insert(
     0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -88,8 +90,8 @@ def create_mock_scandir(uid_override=None):
     return mock_scandir
 
 
-def test_find_owned_files_basic(temp_dirs):
-    """Test basic functionality: find files owned by user."""
+def test_find_owned_files_basic_indir(temp_dirs):
+    """Test basic functionality: find files owned by user in a directory."""
     source_dir, _ = temp_dirs
     user_uid = os.stat(source_dir).st_uid
 
@@ -109,6 +111,34 @@ def test_find_owned_files_basic(temp_dirs):
 
     # Verify both files were found
     assert len(found_files) == 2
+    assert file1 in found_files
+    assert file2 in found_files
+
+
+def test_find_owned_files_basic_asfiles(temp_dirs):
+    """Test basic functionality: find files owned by user given their paths directly."""
+    source_dir, _ = temp_dirs
+    user_uid = os.stat(source_dir).st_uid
+
+    # Create files
+    file1 = os.path.join(source_dir, "file1.txt")
+    file2 = os.path.join(source_dir, "file2.txt")
+    file_list = [file1, file2]
+
+    for file in file_list:
+        with open(file, "w", encoding="utf-8") as f:
+            f.write("content")
+
+    # Find owned files
+    found_files = []
+    for file in file_list:
+        found_files += list(
+            relink.find_owned_files_scandir(file, user_uid, inputdata_root=source_dir)
+        )
+
+    # Verify both files were found
+    assert len(found_files) == 2
+    print(f"{found_files=}")
     assert file1 in found_files
     assert file2 in found_files
 

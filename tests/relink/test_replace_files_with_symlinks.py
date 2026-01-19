@@ -27,13 +27,13 @@ def fixture_mock_replace_one():
         yield mock
 
 
-def test_basic_file_replacement(temp_dirs, current_user, mock_replace_one):
-    """Test basic functionality: replace owned file with symlink."""
-    source_dir, target_dir = temp_dirs
+def test_basic_file_replacement_given_dir(temp_dirs, current_user, mock_replace_one):
+    """Test basic functionality: given directory, replace owned file with symlink."""
+    inputdata_root, target_dir = temp_dirs
     username = current_user
 
     # Create a file in source directory
-    source_file = os.path.join(source_dir, "test_file.txt")
+    source_file = os.path.join(inputdata_root, "test_file.txt")
     with open(source_file, "w", encoding="utf-8") as f:
         f.write("source content")
 
@@ -44,12 +44,41 @@ def test_basic_file_replacement(temp_dirs, current_user, mock_replace_one):
 
     # Run the function
     relink.replace_files_with_symlinks(
-        source_dir, target_dir, username, inputdata_root=source_dir
+        inputdata_root, target_dir, username, inputdata_root=inputdata_root
     )
 
     # Verify replace_one_file_with_symlink() was called correctly
     mock_replace_one.assert_called_once_with(
-        source_dir,
+        inputdata_root,
+        target_dir,
+        source_file,
+        dry_run=False,
+    )
+
+
+def test_basic_file_replacement_given_file(temp_dirs, current_user, mock_replace_one):
+    """Test basic functionality: given owned file, replace with symlink."""
+    inputdata_root, target_dir = temp_dirs
+    username = current_user
+
+    # Create a file in source directory
+    source_file = os.path.join(inputdata_root, "test_file.txt")
+    with open(source_file, "w", encoding="utf-8") as f:
+        f.write("source content")
+
+    # Create corresponding file in target directory
+    target_file = os.path.join(target_dir, "test_file.txt")
+    with open(target_file, "w", encoding="utf-8") as f:
+        f.write("target content")
+
+    # Run the function
+    relink.replace_files_with_symlinks(
+        source_file, target_dir, username, inputdata_root=inputdata_root
+    )
+
+    # Verify replace_one_file_with_symlink() was called correctly
+    mock_replace_one.assert_called_once_with(
+        inputdata_root,
         target_dir,
         source_file,
         dry_run=False,
@@ -58,11 +87,11 @@ def test_basic_file_replacement(temp_dirs, current_user, mock_replace_one):
 
 def test_dry_run(temp_dirs, current_user, mock_replace_one):
     """Test that dry_run=True is passed correctly."""
-    source_dir, target_dir = temp_dirs
+    inputdata_root, target_dir = temp_dirs
     username = current_user
 
     # Create a file in source directory
-    source_file = os.path.join(source_dir, "test_file.txt")
+    source_file = os.path.join(inputdata_root, "test_file.txt")
     with open(source_file, "w", encoding="utf-8") as f:
         f.write("source content")
 
@@ -73,16 +102,16 @@ def test_dry_run(temp_dirs, current_user, mock_replace_one):
 
     # Run the function
     relink.replace_files_with_symlinks(
-        source_dir,
+        inputdata_root,
         target_dir,
         username,
-        inputdata_root=source_dir,
+        inputdata_root=inputdata_root,
         dry_run=True,
     )
 
     # Verify replace_one_file_with_symlink() was called correctly
     mock_replace_one.assert_called_once_with(
-        source_dir,
+        inputdata_root,
         target_dir,
         source_file,
         dry_run=True,
@@ -91,16 +120,16 @@ def test_dry_run(temp_dirs, current_user, mock_replace_one):
 
 def test_nested_directory_structure(temp_dirs, current_user, mock_replace_one):
     """Test with nested directory structures."""
-    source_dir, target_dir = temp_dirs
+    inputdata_root, target_dir = temp_dirs
     username = current_user
 
     # Create nested directories
     nested_path = os.path.join("subdir1", "subdir2")
-    os.makedirs(os.path.join(source_dir, nested_path))
+    os.makedirs(os.path.join(inputdata_root, nested_path))
     os.makedirs(os.path.join(target_dir, nested_path))
 
     # Create files in nested directories
-    source_file = os.path.join(source_dir, nested_path, "nested_file.txt")
+    source_file = os.path.join(inputdata_root, nested_path, "nested_file.txt")
     target_file = os.path.join(target_dir, nested_path, "nested_file.txt")
 
     with open(source_file, "w", encoding="utf-8") as f:
@@ -110,12 +139,12 @@ def test_nested_directory_structure(temp_dirs, current_user, mock_replace_one):
 
     # Run the function
     relink.replace_files_with_symlinks(
-        source_dir, target_dir, username, inputdata_root=source_dir
+        inputdata_root, target_dir, username, inputdata_root=inputdata_root
     )
 
     # Verify replace_one_file_with_symlink() was called correctly
     mock_replace_one.assert_called_once_with(
-        source_dir,
+        inputdata_root,
         target_dir,
         source_file,
         dry_run=False,
@@ -124,7 +153,7 @@ def test_nested_directory_structure(temp_dirs, current_user, mock_replace_one):
 
 def test_skip_existing_symlinks(temp_dirs, current_user, caplog, mock_replace_one):
     """Test that existing symlinks are skipped."""
-    source_dir, target_dir = temp_dirs
+    inputdata_root, target_dir = temp_dirs
     username = current_user
 
     # Create a target file
@@ -133,14 +162,14 @@ def test_skip_existing_symlinks(temp_dirs, current_user, caplog, mock_replace_on
         f.write("target")
 
     # Create a symlink in source (pointing somewhere else)
-    source_link = os.path.join(source_dir, "existing_link.txt")
+    source_link = os.path.join(inputdata_root, "existing_link.txt")
     dummy_target = os.path.join(tempfile.gettempdir(), "somewhere")
     os.symlink(dummy_target, source_link)
 
     # Run the function
     with caplog.at_level(logging.DEBUG):
         relink.replace_files_with_symlinks(
-            source_dir, target_dir, username, inputdata_root=source_dir
+            inputdata_root, target_dir, username, inputdata_root=inputdata_root
         )
 
     # Verify replace_one_file_with_symlink() wasn't called
@@ -149,23 +178,23 @@ def test_skip_existing_symlinks(temp_dirs, current_user, caplog, mock_replace_on
 
 def test_missing_target_file(temp_dirs, current_user, caplog, mock_replace_one):
     """Test behavior when target file doesn't exist."""
-    source_dir, target_dir = temp_dirs
+    inputdata_root, target_dir = temp_dirs
     username = current_user
 
     # Create only source file (no corresponding target)
-    source_file = os.path.join(source_dir, "orphan.txt")
+    source_file = os.path.join(inputdata_root, "orphan.txt")
     with open(source_file, "w", encoding="utf-8") as f:
         f.write("orphan content")
 
     # Run the function
     with caplog.at_level(logging.INFO):
         relink.replace_files_with_symlinks(
-            source_dir, target_dir, username, inputdata_root=source_dir
+            inputdata_root, target_dir, username, inputdata_root=inputdata_root
         )
 
     # Verify replace_one_file_with_symlink() was called correctly
     mock_replace_one.assert_called_once_with(
-        source_dir,
+        inputdata_root,
         target_dir,
         source_file,
         dry_run=False,
@@ -174,7 +203,7 @@ def test_missing_target_file(temp_dirs, current_user, caplog, mock_replace_one):
 
 def test_invalid_username(temp_dirs, caplog, mock_replace_one):
     """Test behavior with invalid username."""
-    source_dir, target_dir = temp_dirs
+    inputdata_root, target_dir = temp_dirs
 
     # Use a username that doesn't exist
     invalid_username = "nonexistent_user_12345"
@@ -188,7 +217,7 @@ def test_invalid_username(temp_dirs, caplog, mock_replace_one):
     # Run the function
     with caplog.at_level(logging.INFO):
         relink.replace_files_with_symlinks(
-            source_dir, target_dir, invalid_username, inputdata_root=source_dir
+            inputdata_root, target_dir, invalid_username, inputdata_root=inputdata_root
         )
 
     # Verify replace_one_file_with_symlink() wasn't called
@@ -197,12 +226,12 @@ def test_invalid_username(temp_dirs, caplog, mock_replace_one):
 
 def test_multiple_files(temp_dirs, current_user, mock_replace_one):
     """Test with multiple files in the directory."""
-    source_dir, target_dir = temp_dirs
+    inputdata_root, target_dir = temp_dirs
     username = current_user
 
     # Create multiple files
     for i in range(5):
-        source_file = os.path.join(source_dir, f"file_{i}.txt")
+        source_file = os.path.join(inputdata_root, f"file_{i}.txt")
         target_file = os.path.join(target_dir, f"file_{i}.txt")
 
         with open(source_file, "w", encoding="utf-8") as f:
@@ -212,20 +241,20 @@ def test_multiple_files(temp_dirs, current_user, mock_replace_one):
 
     # Run the function
     relink.replace_files_with_symlinks(
-        source_dir, target_dir, username, inputdata_root=source_dir
+        inputdata_root, target_dir, username, inputdata_root=inputdata_root
     )
 
     # Verify replace_one_file_with_symlink() was called correctly
     calls = []
     for i in range(5):
-        source_file = os.path.join(source_dir, f"file_{i}.txt")
-        calls.append(call(source_dir, target_dir, source_file, dry_run=False))
+        source_file = os.path.join(inputdata_root, f"file_{i}.txt")
+        calls.append(call(inputdata_root, target_dir, source_file, dry_run=False))
     mock_replace_one.assert_has_calls(calls, any_order=True)
 
 
 def test_multiple_files_nested(temp_dirs, current_user, mock_replace_one):
     """Test with multiple files scattered throughout a nested directory tree."""
-    source_dir, target_dir = temp_dirs
+    inputdata_root, target_dir = temp_dirs
     username = current_user
 
     # Create nested directory structure with files at different levels
@@ -242,7 +271,7 @@ def test_multiple_files_nested(temp_dirs, current_user, mock_replace_one):
     # Create all files and their parent directories
     source_files = []
     for rel_path in test_files:
-        source_file = os.path.join(source_dir, rel_path)
+        source_file = os.path.join(inputdata_root, rel_path)
         source_files.append(source_file)
         target_file = os.path.join(target_dir, rel_path)
 
@@ -258,23 +287,23 @@ def test_multiple_files_nested(temp_dirs, current_user, mock_replace_one):
 
     # Run the function
     relink.replace_files_with_symlinks(
-        source_dir, target_dir, username, inputdata_root=source_dir
+        inputdata_root, target_dir, username, inputdata_root=inputdata_root
     )
 
     # Verify replace_one_file_with_symlink() was called correctly
     calls = []
     for source_file in source_files:
-        calls.append(call(source_dir, target_dir, source_file, dry_run=False))
+        calls.append(call(inputdata_root, target_dir, source_file, dry_run=False))
     mock_replace_one.assert_has_calls(calls, any_order=True)
 
 
 def test_absolute_paths(temp_dirs, current_user, mock_replace_one):
     """Test that function handles relative paths by converting to absolute."""
-    source_dir, target_dir = temp_dirs
+    inputdata_root, target_dir = temp_dirs
     username = current_user
 
     # Create test files
-    source_file = os.path.join(source_dir, "test.txt")
+    source_file = os.path.join(inputdata_root, "test.txt")
     target_file = os.path.join(target_dir, "test.txt")
 
     with open(source_file, "w", encoding="utf-8") as f:
@@ -285,20 +314,20 @@ def test_absolute_paths(temp_dirs, current_user, mock_replace_one):
     # Use relative paths (if possible)
     cwd = os.getcwd()
     try:
-        os.chdir(os.path.dirname(source_dir))
-        rel_source = os.path.basename(source_dir)
+        os.chdir(os.path.dirname(inputdata_root))
+        rel_source = os.path.basename(inputdata_root)
         rel_target = os.path.basename(target_dir)
 
         # Run with relative paths
         relink.replace_files_with_symlinks(
-            rel_source, rel_target, username, inputdata_root=source_dir
+            rel_source, rel_target, username, inputdata_root=inputdata_root
         )
     finally:
         os.chdir(cwd)
 
     # Verify replace_one_file_with_symlink() was called correctly
     mock_replace_one.assert_called_once_with(
-        source_dir,
+        inputdata_root,
         target_dir,
         source_file,
         dry_run=False,
@@ -307,28 +336,28 @@ def test_absolute_paths(temp_dirs, current_user, mock_replace_one):
 
 def test_print_searching_message(temp_dirs, current_user, caplog):
     """Test that searching message is printed."""
-    source_dir, target_dir = temp_dirs
+    inputdata_root, target_dir = temp_dirs
     username = current_user
 
     # Run the function
     with caplog.at_level(logging.INFO):
         relink.replace_files_with_symlinks(
-            source_dir, target_dir, username, inputdata_root=source_dir
+            inputdata_root, target_dir, username, inputdata_root=inputdata_root
         )
 
     # Check that searching message was logged
     assert f"Searching for files owned by '{username}'" in caplog.text
-    assert f"in '{os.path.abspath(source_dir)}'" in caplog.text
+    assert f"in '{os.path.abspath(inputdata_root)}'" in caplog.text
 
 
 def test_empty_directories(temp_dirs, mock_replace_one):
     """Test with empty directories."""
-    source_dir, target_dir = temp_dirs
+    inputdata_root, target_dir = temp_dirs
     username = os.environ["USER"]
 
     # Run with empty directories (should not crash)
     relink.replace_files_with_symlinks(
-        source_dir, target_dir, username, inputdata_root=source_dir
+        inputdata_root, target_dir, username, inputdata_root=inputdata_root
     )
 
     # Verify replace_one_file_with_symlink() wasn't called
@@ -337,11 +366,11 @@ def test_empty_directories(temp_dirs, mock_replace_one):
 
 def test_file_with_spaces_in_name(temp_dirs, mock_replace_one):
     """Test files with spaces in their names."""
-    source_dir, target_dir = temp_dirs
+    inputdata_root, target_dir = temp_dirs
     username = os.environ["USER"]
 
     # Create files with spaces
-    source_file = os.path.join(source_dir, "file with spaces.txt")
+    source_file = os.path.join(inputdata_root, "file with spaces.txt")
     target_file = os.path.join(target_dir, "file with spaces.txt")
 
     with open(source_file, "w", encoding="utf-8") as f:
@@ -351,12 +380,12 @@ def test_file_with_spaces_in_name(temp_dirs, mock_replace_one):
 
     # Run the function
     relink.replace_files_with_symlinks(
-        source_dir, target_dir, username, inputdata_root=source_dir
+        inputdata_root, target_dir, username, inputdata_root=inputdata_root
     )
 
     # Verify replace_one_file_with_symlink() was called correctly
     mock_replace_one.assert_called_once_with(
-        source_dir,
+        inputdata_root,
         target_dir,
         source_file,
         dry_run=False,
@@ -365,12 +394,12 @@ def test_file_with_spaces_in_name(temp_dirs, mock_replace_one):
 
 def test_file_with_special_characters(temp_dirs, mock_replace_one):
     """Test files with special characters in names."""
-    source_dir, target_dir = temp_dirs
+    inputdata_root, target_dir = temp_dirs
     username = os.environ["USER"]
 
     # Create files with special chars (that are valid in filenames)
     filename = "file-with_special.chars@123.txt"
-    source_file = os.path.join(source_dir, filename)
+    source_file = os.path.join(inputdata_root, filename)
     target_file = os.path.join(target_dir, filename)
 
     with open(source_file, "w", encoding="utf-8") as f:
@@ -380,12 +409,12 @@ def test_file_with_special_characters(temp_dirs, mock_replace_one):
 
     # Run the function
     relink.replace_files_with_symlinks(
-        source_dir, target_dir, username, inputdata_root=source_dir
+        inputdata_root, target_dir, username, inputdata_root=inputdata_root
     )
 
     # Verify replace_one_file_with_symlink() was called correctly
     mock_replace_one.assert_called_once_with(
-        source_dir,
+        inputdata_root,
         target_dir,
         source_file,
         dry_run=False,

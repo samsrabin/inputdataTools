@@ -35,7 +35,7 @@ def always(self, message, *args, **kwargs):
 logging.Logger.always = always
 
 
-def _handle_non_dir_entry(entry, user_uid):
+def _handle_non_dir_entry(entry: os.DirEntry, user_uid: int):
     """
     Check if a non-directory entry is owned by the user and should be processed.
 
@@ -61,6 +61,38 @@ def _handle_non_dir_entry(entry, user_uid):
     return None
 
 
+def _handle_non_dir_str(path: str, user_uid: int):
+    """
+    Check if a non-directory string is owned by the user and should be processed. This should only
+    ever be needed if the user specified a file to process on the command line. Because we don't
+    expect users to process large numbers of files at once in this way, it's okay if this function
+    isn't performance-optimized.
+
+    Args:
+        path (str): A filesystem path.
+        user_uid (int): The UID of the user whose files to find.
+
+    Returns:
+        str or None: The absolute path to the file if it's owned by the user
+                     and is a regular file (not a symlink), otherwise None.
+    """
+    # Is this even owned by the user?
+    if os.stat(path, follow_symlinks=False).st_uid == user_uid:
+
+        is_file = os.path.isfile(path)
+        is_symlink = os.path.islink(path)
+
+        # Log about skipping symlinks
+        if is_symlink:
+            logger.debug("Skipping symlink: %s", path)
+
+        # Return if it's a file (and not a symlink)
+        elif is_file:
+            return path
+
+    return None
+
+
 def handle_non_dir(var, user_uid, inputdata_root):
     """
     Check if a non-directory is owned by the user and should be processed. Passes var to a
@@ -79,14 +111,22 @@ def handle_non_dir(var, user_uid, inputdata_root):
         TypeError: If var is not a DirEntry-like object.
         ValueError: If the file path is not under inputdata_root.
     """
+    logger.debug("starting handle_non_dir()")
 
+    # Handle a variable of type str.
+    if isinstance(var, str):
+        logger.debug("isinstance(var, str)")
+        file_path = _handle_non_dir_str(var, user_uid)
+
+    # Handle a variable of type like os.DirEntry.
     # Fall back to duck typing: If var has the required DirEntry methods and members, treat it as a
     # DirEntry. This is necessary for this conditional to work with the MockDirEntry type used in
     # testing. ("If it looks, walks, and quacks like a duck...")
-    if isinstance(var, os.DirEntry) or all(
+    elif isinstance(var, os.DirEntry) or all(
         hasattr(var, m) for m in ["stat", "is_file", "is_symlink", "path"]
     ):
         file_path = _handle_non_dir_entry(var, user_uid)
+
     else:
         raise TypeError(
             f"Unsure how to handle non-directory variable of type {type(var)}"
@@ -101,7 +141,7 @@ def handle_non_dir(var, user_uid, inputdata_root):
     return file_path
 
 
-def find_owned_files_scandir(directory, user_uid, inputdata_root=DEFAULT_SOURCE_ROOT):
+def find_owned_files_scandir(item, user_uid, inputdata_root=DEFAULT_SOURCE_ROOT):
     """
     Efficiently find all files owned by a specific user using os.scandir().
 
@@ -109,7 +149,7 @@ def find_owned_files_scandir(directory, user_uid, inputdata_root=DEFAULT_SOURCE_
     information during directory traversal, reducing system calls.
 
     Args:
-        directory (str): The root directory to search.
+        item (str): The root directory to search, or the file to check.
         user_uid (int): The UID of the user whose files to find.
         inputdata_root (str): The root of the directory tree containing CESM input data.
 
@@ -120,7 +160,7 @@ def find_owned_files_scandir(directory, user_uid, inputdata_root=DEFAULT_SOURCE_
         ValueError: If any file found is not under inputdata_root.
     """
     try:
-        with os.scandir(directory) as entries:
+        with os.scandir(item) as entries:
             for entry in entries:
                 try:
                     # Recursively process directories (not following symlinks)
@@ -139,12 +179,16 @@ def find_owned_files_scandir(directory, user_uid, inputdata_root=DEFAULT_SOURCE_
                     logger.debug("Error accessing %s: %s. Skipping.", entry.path, e)
                     continue
 
+    except NotADirectoryError:
+        if (file_path := handle_non_dir(item, user_uid, inputdata_root)) is not None:
+            yield file_path
+
     except (OSError, PermissionError) as e:
-        logger.debug("Error accessing %s: %s. Skipping.", directory, e)
+        logger.warning("Error accessing %s: %s. Skipping.", item, e)
 
 
 def replace_files_with_symlinks(
-    source_dir, target_dir, username, inputdata_root=DEFAULT_SOURCE_ROOT, dry_run=False
+    item_to_process, target_dir, username, inputdata_root=DEFAULT_SOURCE_ROOT, dry_run=False
 ):
     """
     Finds files owned by a specific user in a source directory tree,
@@ -152,13 +196,13 @@ def replace_files_with_symlinks(
     relative path in a target directory tree.
 
     Args:
-        source_dir (str): The root of the directory tree to search for files.
+        item_to_process (str): The root directory to search, or the file to process.
         target_dir (str): The root of the directory tree containing the new files.
         inputdata_root (str): The root of the directory tree containing CESM input data.
         username (str): The name of the user whose files will be processed.
         dry_run (bool): If True, only show what would be done without making changes.
     """
-    source_dir = os.path.abspath(source_dir)
+    item_to_process = os.path.abspath(item_to_process)
     target_dir = os.path.abspath(target_dir)
 
     # Get the user ID (UID) for the specified username
@@ -175,23 +219,23 @@ def replace_files_with_symlinks(
         "Searching for files owned by '%s' (UID: %s) in '%s'...",
         username,
         user_uid,
-        source_dir,
+        item_to_process,
     )
 
     # Use efficient scandir-based search
-    for file_path in find_owned_files_scandir(source_dir, user_uid, inputdata_root):
-        replace_one_file_with_symlink(
-            source_dir, target_dir, file_path, dry_run=dry_run
-        )
+    for file_path in find_owned_files_scandir(item_to_process, user_uid, inputdata_root):
+        replace_one_file_with_symlink(inputdata_root, target_dir, file_path, dry_run=dry_run)
 
 
-def replace_one_file_with_symlink(source_dir, target_dir, file_path, dry_run=False):
+def replace_one_file_with_symlink(
+    inputdata_root, target_dir, file_path, dry_run=False
+):
     """
     Given a file, replaces it with a symbolic link to the same relative path in a target directory
     tree.
 
     Args:
-        source_dir (str): The root of the directory tree to search for files.
+        inputdata_root (str): The root of the directory tree containing CESM input data.
         target_dir (str): The root of the directory tree containing the new files.
         file_path (str): The path of the file to be replaced.
         dry_run (bool): If True, only show what would be done without making changes.
@@ -199,14 +243,14 @@ def replace_one_file_with_symlink(source_dir, target_dir, file_path, dry_run=Fal
     logger.info("Found owned file: %s", file_path)
 
     # Determine the relative path and the new link's destination
-    relative_path = os.path.relpath(file_path, source_dir)
+    relative_path = os.path.relpath(file_path, inputdata_root)
     link_target = os.path.join(target_dir, relative_path)
 
     # Check if the target file actually exists
     if not os.path.exists(link_target):
         logger.warning(
-            "Warning: Corresponding file not found in '%s' for '%s'. Skipping.",
-            target_dir,
+            "Warning: Corresponding file '%s' not found for '%s'. Skipping.",
+            link_target,
             file_path,
         )
         return
@@ -242,9 +286,9 @@ def replace_one_file_with_symlink(source_dir, target_dir, file_path, dry_run=Fal
         logger.error("Error creating symlink for %s: %s. Skipping.", link_name, e)
 
 
-def validate_directory(path):
+def validate_paths(path, check_is_dir=False):
     """
-    Validate that one or more paths exist and are directories.
+    Validate that one or more paths exist.
 
     Args:
         path (str or list): The path to validate, or a list of such paths.
@@ -253,19 +297,35 @@ def validate_directory(path):
         str or list: The absolute path(s) if valid.
 
     Raises:
-        argparse.ArgumentTypeError: If a path doesn't exist or is not a directory.
+        argparse.ArgumentTypeError: If a path doesn't exist.
     """
     if isinstance(path, list):
         result = []
         for item in path:
-            result.append(validate_directory(item))
+            result.append(validate_paths(item, check_is_dir=check_is_dir))
         return result
 
     if not os.path.exists(path):
-        raise argparse.ArgumentTypeError(f"Directory '{path}' does not exist")
-    if not os.path.isdir(path):
+        raise argparse.ArgumentTypeError(f"'{path}' does not exist")
+    if check_is_dir and not os.path.isdir(path):
         raise argparse.ArgumentTypeError(f"'{path}' is not a directory")
     return os.path.abspath(path)
+
+
+def validate_directory(path):
+    """
+    Validate that one or more directories exist.
+
+    Args:
+        path (str or list): The directory to validate, or a list of such directories.
+
+    Returns:
+        str or list: The absolute path(s) if valid.
+
+    Raises:
+        argparse.ArgumentTypeError: If a path doesn't exist.
+    """
+    return validate_paths(path, check_is_dir=True)
 
 
 def parse_arguments():
@@ -273,7 +333,7 @@ def parse_arguments():
     Parse command-line arguments.
 
     Returns:
-        argparse.Namespace: Parsed arguments containing source_root,
+        argparse.Namespace: Parsed arguments containing items_to_process,
                             target_root, and verbosity settings.
     """
     parser = argparse.ArgumentParser(
@@ -282,11 +342,12 @@ def parse_arguments():
         )
     )
     parser.add_argument(
-        "source_root",
+        "items_to_process",
         nargs="*",
         default=DEFAULT_SOURCE_ROOT,
+        type=validate_paths,
         help=(
-            f"One or more directories to search for files (default: {DEFAULT_SOURCE_ROOT})"
+            f"One or more (directories to search for) files (default: {DEFAULT_SOURCE_ROOT})"
         ),
     )
     parser.add_argument(
@@ -356,13 +417,13 @@ def process_args(args):
     else:
         args.log_level = logging.INFO
 
-    # Ensure that source_root is a list
-    if hasattr(args, "source_root") and not isinstance(args.source_root, list):
-        args.source_root = [args.source_root]
+    # Ensure that items_to_process is a list
+    if hasattr(args, "items_to_process") and not isinstance(args.items_to_process, list):
+        args.items_to_process = [args.items_to_process]
 
-    # Check that every item in source_root is a child of inputdata_root
-    if hasattr(args, "source_root"):  # Sometimes doesn't if we're testing
-        for item in args.source_root:
+    # Check that every item in items_to_process is a child of inputdata_root
+    if hasattr(args, "items_to_process"):  # Sometimes doesn't if we're testing
+        for item in args.items_to_process:
             if not Path(item).is_relative_to(args.inputdata_root):
                 raise argparse.ArgumentTypeError(
                     f"Item '{item}' not under inputdata root '{args.inputdata_root}'"
@@ -378,6 +439,7 @@ def process_args(args):
 
 
 def main():
+    # pylint: disable=missing-function-docstring
 
     args = parse_arguments()
 
@@ -388,7 +450,7 @@ def main():
     start_time = time.time()
 
     # --- Execution ---
-    for item in args.source_root:
+    for item in args.items_to_process:
         replace_files_with_symlinks(
             item,
             args.target_root,
