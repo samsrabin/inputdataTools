@@ -122,6 +122,8 @@ def stage_data(src: Path, inputdata_root: Path, staging_root: Path) -> None:
     try:
         rel = src.resolve().relative_to(inputdata_root.resolve())
     except ValueError:
+        # TODO: Do not hard-code string here
+        # TODO: Check whether it's IN THE DIRECTORY, not whether the path contains a string
         if "d651077" in str(src):
             raise RuntimeError(f"Source file {src.name} is already published.")
         else:
@@ -137,13 +139,16 @@ def ensure_running_as(target_user: str, argv: list[str]) -> None:
     try:
         target_uid = pwd.getpwnam(target_user).pw_uid
     except KeyError:
+        # TODO: Raise Python error instead of SystemExit
         print(f"rimport: target user '{target_user}' not found on this system", file=sys.stderr)
         raise SystemExit(2)
 
     if os.geteuid() != target_uid:
         if not sys.stdin.isatty():
+            # TODO: Do not hard-code "cesmdata" here
             print("rimport: need interactive TTY to authenticate as 'cesmdata' (2FA).\n"
                   "         Try: sudo -u cesmdata rimport …", file=sys.stderr)
+            # TODO: Raise Python error instead of SystemExit
             raise SystemExit(2)
         # Re-exec under target user; this invokes sudo’s normal password/2FA flow.
         os.execvp("sudo", ["sudo", "-u", target_user, "--"] + argv)
