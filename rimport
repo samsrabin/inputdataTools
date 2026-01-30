@@ -69,13 +69,17 @@ def build_parser() -> argparse.ArgumentParser:
     # Mutually exclusive: -file or -list (one required)
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("-file", dest="file", metavar="filename", help=argparse.SUPPRESS)
-    group.add_argument("-list", dest="filelist", metavar="filelist", help=argparse.SUPPRESS)
+    group.add_argument(
+        "-list", dest="filelist", metavar="filelist", help=argparse.SUPPRESS
+    )
 
     parser.add_argument(
         "-inputdata",
         dest="inputdata",
         metavar="inputdata_dir",
-        default=os.path.join("/glade","campaign","cesm","cesmdata","cseg","inputdata"),
+        default=os.path.join(
+            "/glade", "campaign", "cesm", "cesmdata", "cseg", "inputdata"
+        ),
         help=argparse.SUPPRESS,
     )
 
@@ -100,9 +104,14 @@ def read_filelist(list_path: Path) -> List[str]:
 def resolve_paths(root: Path, relnames: Iterable[str]) -> List[Path]:
     paths: List[Path] = []
     for name in relnames:
-        p = (root / name).resolve() if not Path(name).is_absolute() else Path(name).resolve()
+        p = (
+            (root / name).resolve()
+            if not Path(name).is_absolute()
+            else Path(name).resolve()
+        )
         paths.append(p)
     return paths
+
 
 def stage_data(src: Path, inputdata_root: Path, staging_root: Path) -> None:
     """Stage a file by mirroring its path under `staging_root`.
@@ -129,12 +138,15 @@ def stage_data(src: Path, inputdata_root: Path, staging_root: Path) -> None:
         if "d651077" in str(src):
             raise RuntimeError(f"Source file {src.name} is already published.")
         else:
-            raise RuntimeError(f"source not under inputdata root: {src} not in {inputdata_root}")
+            raise RuntimeError(
+                f"source not under inputdata root: {src} not in {inputdata_root}"
+            )
 
     dst = staging_root / rel
     dst.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(src, dst)
     print(f"[rimport] staged {src} -> {dst}")
+
 
 def ensure_running_as(target_user: str, argv: list[str]) -> None:
     """If not running as `target_user`, re-exec via sudo -u target_user (handles 2FA via PAM)."""
@@ -142,18 +154,25 @@ def ensure_running_as(target_user: str, argv: list[str]) -> None:
         target_uid = pwd.getpwnam(target_user).pw_uid
     except KeyError:
         # TODO: Raise Python error instead of SystemExit
-        print(f"rimport: target user '{target_user}' not found on this system", file=sys.stderr)
+        print(
+            f"rimport: target user '{target_user}' not found on this system",
+            file=sys.stderr,
+        )
         raise SystemExit(2)
 
     if os.geteuid() != target_uid:
         if not sys.stdin.isatty():
             # TODO: Do not hard-code "cesmdata" here
-            print("rimport: need interactive TTY to authenticate as 'cesmdata' (2FA).\n"
-                  "         Try: sudo -u cesmdata rimport …", file=sys.stderr)
+            print(
+                "rimport: need interactive TTY to authenticate as 'cesmdata' (2FA).\n"
+                "         Try: sudo -u cesmdata rimport …",
+                file=sys.stderr,
+            )
             # TODO: Raise Python error instead of SystemExit
             raise SystemExit(2)
         # Re-exec under target user; this invokes sudo’s normal password/2FA flow.
         os.execvp("sudo", ["sudo", "-u", target_user, "--"] + argv)
+
 
 # TODO: Unused; delete.
 def safe_mvandlink(src: Path, dst: Path) -> None:
@@ -165,6 +184,7 @@ def safe_mvandlink(src: Path, dst: Path) -> None:
     link_target = str(moved_to)
     os.symlink(link_target, src)
 
+
 def get_staging_root() -> Path:
     """Return the staging root. Uses $RIMPORT_STAGING if set, otherwise
     creates a sibling directory named '<inputdata_root>.staging'."""
@@ -174,7 +194,7 @@ def get_staging_root() -> Path:
     # TODO: This should be a module-level variable.
     return Path("/glade/campaign/collections/gdex/data/d651077/cesmdata/inputdata")
 
-    
+
 def main(argv: List[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
