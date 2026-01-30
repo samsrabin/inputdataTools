@@ -153,6 +153,7 @@ def ensure_running_as(target_user: str, argv: list[str]) -> None:
         # Re-exec under target user; this invokes sudo’s normal password/2FA flow.
         os.execvp("sudo", ["sudo", "-u", target_user, "--"] + argv)
 
+# TODO: Unused; delete.
 def safe_mvandlink(src: Path, dst: Path) -> None:
     dst.parent.mkdir(parents=True, exist_ok=True)
     # Move (handles cross-filesystem with copy2+remove under the hood)
