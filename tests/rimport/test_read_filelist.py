@@ -100,7 +100,7 @@ class TestReadFilelist:
 
     def test_file_with_only_comments_and_blanks(self, tmp_path):
         """Test file with only comments and blank lines."""
-        list_file = tmp_path / "filelist.txt"
+        list_file = tmp_path / "filelist123.txt"
         list_file.write_text("# Comment 1\n\n# Comment 2\n\n")
 
         result = rimport.read_filelist(list_file)
