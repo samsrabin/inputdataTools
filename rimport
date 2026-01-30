@@ -1,4 +1,6 @@
 #!/glade/u/apps/derecho/24.12/opt/view/bin/python
+# TODO: Move all the Python into new file rimport.py for simpler testing. Keep rimport as a
+# convenience wrapper.
 """
 A drop-in CLI replacement for the legacy `rimport` csh tool.
 
@@ -169,6 +171,7 @@ def get_staging_root() -> Path:
     env = os.getenv("RIMPORT_STAGING")
     if env:
         return Path(env).expanduser().resolve()
+    # TODO: This should be a module-level variable.
     return Path("/glade/campaign/collections/gdex/data/d651077/cesmdata/inputdata")
 
     
