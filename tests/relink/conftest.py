@@ -16,8 +16,8 @@ def fixture_temp_dirs():
     source_dir = tempfile.mkdtemp(prefix="test_source_")
     target_dir = tempfile.mkdtemp(prefix="test_target_")
 
-    with patch("relink.DEFAULT_SOURCE_ROOT", source_dir):
-        with patch("relink.DEFAULT_TARGET_ROOT", target_dir):
+    with patch("relink.DEFAULT_INPUTDATA_ROOT", source_dir):
+        with patch("relink.DEFAULT_STAGING_ROOT", target_dir):
             yield source_dir, target_dir
 
     # Cleanup
