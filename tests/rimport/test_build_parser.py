@@ -32,19 +32,29 @@ class TestBuildParser:
         parser = rimport.build_parser()
         assert isinstance(parser, argparse.ArgumentParser)
 
-    def test_file_argument_accepted(self):
-        """Test that -file argument is accepted."""
+    @pytest.mark.parametrize("file_flag", ["-file", "-f", "--file"])
+    def test_file_arguments_accepted(self, file_flag):
+        """Test that all file argument flags are accepted."""
         parser = rimport.build_parser()
-        args = parser.parse_args(["-file", "test.txt"])
+        args = parser.parse_args([file_flag, "test.txt"])
         assert args.file == "test.txt"
         assert args.filelist is None
 
-    def test_list_argument_accepted(self):
-        """Test that -list argument is accepted."""
+    @pytest.mark.parametrize("list_flag", ["-list", "-l", "--list"])
+    def test_list_arguments_accepted(self, list_flag):
+        """Test that all list argument flags are accepted."""
         parser = rimport.build_parser()
-        args = parser.parse_args(["-list", "files.txt"])
+        args = parser.parse_args([list_flag, "files.txt"])
         assert args.filelist == "files.txt"
         assert args.file is None
+
+    @pytest.mark.parametrize("inputdata_flag", ["-inputdata", "-i", "--inputdata"])
+    def test_inputdata_arguments_accepted(self, inputdata_flag):
+        """Test that all inputdata argument flags are accepted."""
+        parser = rimport.build_parser()
+        inputdata_dir = "/some/dir"
+        args = parser.parse_args([inputdata_flag, inputdata_dir, "-f", "dummy_file.nc"])
+        assert args.inputdata == inputdata_dir
 
     def test_file_and_list_mutually_exclusive(self, capsys):
         """Test that -file and -list cannot be used together."""

@@ -31,12 +31,14 @@ def build_parser() -> argparse.ArgumentParser:
     # Mutually exclusive: -file or -list (one required)
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument(
+        "--file",
         "-file",
         dest="file",
         metavar="filename",
         help="Provide a single filename relative to the top inputdata directory",
     )
     group.add_argument(
+        "--list",
         "-list",
         dest="filelist",
         metavar="filelist",
@@ -47,6 +49,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     parser.add_argument(
+        "--inputdata",
         "-inputdata",
         dest="inputdata",
         metavar="inputdata_dir",
