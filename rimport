@@ -24,6 +24,18 @@ STAGE_OWNER = "cesmdata"
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """Build and configure the argument parser for rimport.
+
+    Creates an ArgumentParser with the following options:
+    - Mutually exclusive required group:
+        --file: Import a single file (relative to inputdata directory)
+        --list: Import multiple files from a list file
+    - Optional:
+        --inputdata: Override the default inputdata directory
+
+    Returns:
+        argparse.ArgumentParser: Configured parser ready to parse command-line arguments.
+    """
     parser = argparse.ArgumentParser(
         description="Copy files from CESM inputdata directory to a publishing directory."
     )
@@ -64,7 +76,18 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def read_filelist(list_path: Path) -> List[str]:
-    """Read list file, ignoring blank lines and comments starting with #."""
+    """Read a file list and return non-empty, non-comment lines.
+
+    Reads a text file containing a list of filenames, filtering out:
+    - Blank lines (empty or whitespace-only)
+    - Comment lines (starting with '#')
+
+    Args:
+        list_path: Path to the file containing the list of filenames.
+
+    Returns:
+        List of stripped, non-empty lines that are not comments.
+    """
     lines: List[str] = []
     with list_path.open("r", encoding="utf-8") as f:
         for raw in f:
@@ -76,6 +99,20 @@ def read_filelist(list_path: Path) -> List[str]:
 
 
 def resolve_paths(root: Path, relnames: Iterable[str]) -> List[Path]:
+    """Convert relative or absolute path names to resolved absolute Paths.
+
+    For each name in relnames:
+    - If the name is relative, it is resolved relative to `root`
+    - If the name is already absolute, it is resolved as-is
+    All paths are resolved to their canonical absolute form.
+
+    Args:
+        root: Base directory for resolving relative paths.
+        relnames: Iterable of path names (relative or absolute) to resolve.
+
+    Returns:
+        List of resolved absolute Path objects.
+    """
     paths: List[Path] = []
     for name in relnames:
         p = (
@@ -89,13 +126,25 @@ def resolve_paths(root: Path, relnames: Iterable[str]) -> List[Path]:
 
 def stage_data(src: Path, inputdata_root: Path, staging_root: Path) -> None:
     """Stage a file by mirroring its path under `staging_root`.
-    Destination path is computed by replacing the `args.inputdata` prefix of `src`
+
+    Destination path is computed by replacing the `inputdata_root` prefix of `src`
     with `staging_root`, i.e.:
-    dst = staging_root / src.relative_to(inputdata_root)
+        dst = staging_root / src.relative_to(inputdata_root)
+
+    Args:
+        src: Source file path to stage.
+        inputdata_root: Root directory of the inputdata tree.
+        staging_root: Root directory where files will be staged.
+
+    Raises:
+        RuntimeError: If `src` is a live symlink (already published), or if `src`
+            is outside the inputdata root, or if `src` is already under staging directory.
+        RuntimeError: If `src` is a broken symlink.
+        FileNotFoundError: If `src` does not exist.
 
     Guardrails:
-    * Raise if `src` is a *live* symlink ("already published").
-    * Raise if `src` is a broken symlink or is outside the inputdata root.
+        * Raise if `src` is a *live* symlink ("already published").
+        * Raise if `src` is a broken symlink or is outside the inputdata root.
     """
     if src.is_symlink() and src.exists():
         # TODO: This should be a regular message, not an error.
@@ -123,7 +172,22 @@ def stage_data(src: Path, inputdata_root: Path, staging_root: Path) -> None:
 
 
 def ensure_running_as(target_user: str, argv: list[str]) -> None:
-    """If not running as `target_user`, re-exec via sudo -u target_user (handles 2FA via PAM)."""
+    """Ensure the script is running as the target user, re-executing via sudo if needed.
+
+    If not running as `target_user`, re-exec via sudo -u target_user (handles 2FA via PAM).
+    This function will not return if re-execution is needed; it replaces the current process.
+
+    Args:
+        target_user: Username to run as (e.g., 'cesmdata').
+        argv: Command-line arguments to pass to the re-executed process.
+
+    Raises:
+        SystemExit: If the target user is not found on the system (exit code 2).
+        SystemExit: If not running interactively and authentication is required (exit code 2).
+
+    Note:
+        If re-execution is needed, this function calls os.execvp() and does not return.
+    """
     try:
         target_uid = pwd.getpwnam(target_user).pw_uid
     except KeyError as exc:
@@ -148,8 +212,13 @@ def ensure_running_as(target_user: str, argv: list[str]) -> None:
 
 
 def get_staging_root() -> Path:
-    """Return the staging root. Uses $RIMPORT_STAGING if set, otherwise
-    creates a sibling directory named '<inputdata_root>.staging'."""
+    """Return the staging root directory path.
+
+    Uses $RIMPORT_STAGING if set, otherwise returns the default staging root.
+
+    Returns:
+        Path: Resolved absolute path to the staging root directory.
+    """
     env = os.getenv("RIMPORT_STAGING")
     if env:
         return Path(env).expanduser().resolve()
@@ -157,6 +226,27 @@ def get_staging_root() -> Path:
 
 
 def main(argv: List[str] | None = None) -> int:
+    """Main entry point for the rimport tool.
+
+    Copies files from the CESM inputdata directory to a staging/publishing directory,
+    preserving the directory structure. Ensures the script runs as the correct user
+    (STAGE_OWNER) and handles both single files and file lists.
+
+    Args:
+        argv: Command-line arguments to parse. If None, uses sys.argv.
+
+    Returns:
+        int: Exit code (0 for success, 1 if any files had errors, 2 for fatal errors).
+
+    Environment Variables:
+        RIMPORT_SKIP_USER_CHECK: Set to "1" to skip automatic user switching.
+        RIMPORT_STAGING: Override the default staging root directory.
+
+    Exit Codes:
+        0: All files staged successfully.
+        1: One or more files failed to stage (errors printed to stderr).
+        2: Fatal error (missing inputdata directory, missing file list, etc.).
+    """
     parser = build_parser()
     args = parser.parse_args(argv)
 
