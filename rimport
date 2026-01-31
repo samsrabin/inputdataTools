@@ -282,7 +282,8 @@ def main(argv: List[str] | None = None) -> int:
     for p in paths:
         try:
             stage_data(p, root, staging_root)
-        except Exception as e:  # Keep CLI robust for batch runs
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            # General Exception keeps CLI robust for batch runs
             errors += 1
             print(f"rimport: error processing {p}: {e}", file=sys.stderr)
 
