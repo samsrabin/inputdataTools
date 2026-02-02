@@ -2,26 +2,9 @@
 # TODO: Move all the Python into new file rimport.py for simpler testing. Keep rimport as a
 # convenience wrapper.
 """
-A drop-in CLI replacement for the legacy `rimport` csh tool.
+Copy files from CESM inputdata directory to a publishing directory.
 
-This script preserves the original command-line interface:
-
-  SYNOPSIS
-      rimport  [-file filename] [-list filelist] [-inputdata inputdata_dir] [-help]
-
-  OPTIONS
-      -file filename
-         provide a single filename relative to the top inputdata directory
-      -list filelist
-         provide a file that contains a list of filenames to import. all filenames
-         in the list are relative to the top inputdata area.
-      -inputdata inputdata_dir
-         change the default local top level inputdata directory
-      -help
-         get help about this tool
-
-Customize the `do_new_action(path)` function to implement the new behavior.
-By default, it prints which files would be processed.
+Do `rimport --help` for more information.
 """
 from __future__ import annotations
 
@@ -33,60 +16,88 @@ import sys
 from pathlib import Path
 from typing import Iterable, List
 
+import shared
 
-class PlainHelpFormatter(argparse.RawTextHelpFormatter):
-    pass
+DEFAULT_INPUTDATA_ROOT = Path(shared.DEFAULT_INPUTDATA_ROOT)
+DEFAULT_STAGING_ROOT = Path(shared.DEFAULT_STAGING_ROOT)
+STAGE_OWNER = "cesmdata"
 
 
 def build_parser() -> argparse.ArgumentParser:
-    synopsis = (
-        "rimport  [-file filename] [-list filelist] [-inputdata inputdata_dir] [-help]"
-    )
+    """Build and configure the argument parser for rimport.
 
-    description = (
-        "SYNOPSIS\n"
-        f"      {synopsis}\n\n"
-        "OPTIONS\n"
-        "      -file filename\n"
-        "         provide a single filename relative to the top inputdata directory\n"
-        "      -list filelist\n"
-        "         provide a file that contains a list of filenames to import. all filenames\n"
-        "         in the list are relative to the top inputdata area.\n"
-        "      -inputdata inputdata_dir\n"
-        "         change the default local top level inputdata directory\n"
-        "      -help\n"
-        "         get help about this tool\n"
-    )
+    Creates an ArgumentParser with the following options:
+    - Mutually exclusive required group:
+        --file: Import a single file (relative to inputdata directory)
+        --list: Import multiple files from a list file
+    - Optional:
+        --inputdata: Override the default inputdata directory
 
+    Returns:
+        argparse.ArgumentParser: Configured parser ready to parse command-line arguments.
+    """
     parser = argparse.ArgumentParser(
-        prog="rimport",
-        description=description,
-        formatter_class=PlainHelpFormatter,
-        add_help=False,  # preserve original -help only
-        usage=synopsis,
+        description="Copy files from CESM inputdata directory to a publishing directory.",
+        add_help=False,  # Disable automatic help to add custom -help flag
     )
 
     # Mutually exclusive: -file or -list (one required)
     group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument("-file", dest="file", metavar="filename", help=argparse.SUPPRESS)
-    group.add_argument("-list", dest="filelist", metavar="filelist", help=argparse.SUPPRESS)
+    group.add_argument(
+        "--file",
+        "-file",
+        dest="file",
+        metavar="filename",
+        help="Provide a single filename relative to the top inputdata directory",
+    )
+    group.add_argument(
+        "--list",
+        "-list",
+        dest="filelist",
+        metavar="filelist",
+        help=(
+            "Provide a file that contains a list of filenames to import. All filenames in the list"
+            "are relative to the top inputdata area."
+        ),
+    )
 
     parser.add_argument(
+        "--inputdata",
         "-inputdata",
         dest="inputdata",
         metavar="inputdata_dir",
-        default=os.path.join("/glade","campaign","cesm","cesmdata","cseg","inputdata"),
-        help=argparse.SUPPRESS,
+        default=DEFAULT_INPUTDATA_ROOT,
+        help=(
+            "Change the default local top level inputdata directory."
+            f" Default: '{DEFAULT_INPUTDATA_ROOT}'"
+        ),
     )
 
-    # Provide -help to mirror legacy behavior
-    parser.add_argument("-help", action="help", help=argparse.SUPPRESS)
+    # Provide -help to mirror legacy behavior (in addition to -h and --help)
+    parser.add_argument(
+        "-h",
+        "--help",
+        "-help",
+        action="help",
+        help="Show this help message and exit",
+    )
 
     return parser
 
 
 def read_filelist(list_path: Path) -> List[str]:
-    """Read list file, ignoring blank lines and comments starting with #."""
+    """Read a file list and return non-empty, non-comment lines.
+
+    Reads a text file containing a list of filenames, filtering out:
+    - Blank lines (empty or whitespace-only)
+    - Comment lines (starting with '#')
+
+    Args:
+        list_path: Path to the file containing the list of filenames.
+
+    Returns:
+        List of stripped, non-empty lines that are not comments.
+    """
     lines: List[str] = []
     with list_path.open("r", encoding="utf-8") as f:
         for raw in f:
@@ -98,23 +109,55 @@ def read_filelist(list_path: Path) -> List[str]:
 
 
 def resolve_paths(root: Path, relnames: Iterable[str]) -> List[Path]:
+    """Convert relative or absolute path names to resolved absolute Paths.
+
+    For each name in relnames:
+    - If the name is relative, it is resolved relative to `root`
+    - If the name is already absolute, it is resolved as-is
+    All paths are resolved to their canonical absolute form.
+
+    Args:
+        root: Base directory for resolving relative paths.
+        relnames: Iterable of path names (relative or absolute) to resolve.
+
+    Returns:
+        List of resolved absolute Path objects.
+    """
     paths: List[Path] = []
     for name in relnames:
-        p = (root / name).resolve() if not Path(name).is_absolute() else Path(name).resolve()
+        p = (
+            (root / name).resolve()
+            if not Path(name).is_absolute()
+            else Path(name).resolve()
+        )
         paths.append(p)
     return paths
 
+
 def stage_data(src: Path, inputdata_root: Path, staging_root: Path) -> None:
     """Stage a file by mirroring its path under `staging_root`.
-    Destination path is computed by replacing the `args.inputdata` prefix of `src`
+
+    Destination path is computed by replacing the `inputdata_root` prefix of `src`
     with `staging_root`, i.e.:
-    dst = staging_root / src.relative_to(inputdata_root)
+        dst = staging_root / src.relative_to(inputdata_root)
+
+    Args:
+        src: Source file path to stage.
+        inputdata_root: Root directory of the inputdata tree.
+        staging_root: Root directory where files will be staged.
+
+    Raises:
+        RuntimeError: If `src` is a live symlink (already published), or if `src`
+            is outside the inputdata root, or if `src` is already under staging directory.
+        RuntimeError: If `src` is a broken symlink.
+        FileNotFoundError: If `src` does not exist.
 
     Guardrails:
-    * Raise if `src` is a *live* symlink ("already published").
-    * Raise if `src` is a broken symlink or is outside the inputdata root.
+        * Raise if `src` is a *live* symlink ("already published").
+        * Raise if `src` is a broken symlink or is outside the inputdata root.
     """
     if src.is_symlink() and src.exists():
+        # TODO: This should be a regular message, not an error.
         raise RuntimeError("File is already published.")
     if src.is_symlink() and not src.exists():
         raise RuntimeError(f"Source is a broken symlink: {src}")
@@ -123,67 +166,105 @@ def stage_data(src: Path, inputdata_root: Path, staging_root: Path) -> None:
 
     try:
         rel = src.resolve().relative_to(inputdata_root.resolve())
-    except ValueError:
-        # TODO: Do not hard-code string here
-        # TODO: Check whether it's IN THE DIRECTORY, not whether the path contains a string
-        if "d651077" in str(src):
-            raise RuntimeError(f"Source file {src.name} is already published.")
-        else:
-            raise RuntimeError(f"source not under inputdata root: {src} not in {inputdata_root}")
+    except ValueError as exc:
+        if src.resolve().is_relative_to(staging_root.resolve()):
+            raise RuntimeError(
+                f"Source file '{src.name}' is already under staging directory '{staging_root}'."
+            ) from exc
+        raise RuntimeError(
+            f"source not under inputdata root: {src} not in {inputdata_root}"
+        ) from exc
 
     dst = staging_root / rel
     dst.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(src, dst)
     print(f"[rimport] staged {src} -> {dst}")
 
+
 def ensure_running_as(target_user: str, argv: list[str]) -> None:
-    """If not running as `target_user`, re-exec via sudo -u target_user (handles 2FA via PAM)."""
+    """Ensure the script is running as the target user, re-executing via sudo if needed.
+
+    If not running as `target_user`, re-exec via sudo -u target_user (handles 2FA via PAM).
+    This function will not return if re-execution is needed; it replaces the current process.
+
+    Args:
+        target_user: Username to run as (e.g., 'cesmdata').
+        argv: Command-line arguments to pass to the re-executed process.
+
+    Raises:
+        SystemExit: If the target user is not found on the system (exit code 2).
+        SystemExit: If not running interactively and authentication is required (exit code 2).
+
+    Note:
+        If re-execution is needed, this function calls os.execvp() and does not return.
+    """
     try:
         target_uid = pwd.getpwnam(target_user).pw_uid
-    except KeyError:
-        # TODO: Raise Python error instead of SystemExit
-        print(f"rimport: target user '{target_user}' not found on this system", file=sys.stderr)
-        raise SystemExit(2)
+    except KeyError as exc:
+        print(
+            f"rimport: target user '{target_user}' not found on this system",
+            file=sys.stderr,
+        )
+        raise SystemExit(2) from exc
 
     if os.geteuid() != target_uid:
-        if not sys.stdin.isatty():
-            # TODO: Do not hard-code "cesmdata" here
-            print("rimport: need interactive TTY to authenticate as 'cesmdata' (2FA).\n"
-                  "         Try: sudo -u cesmdata rimport …", file=sys.stderr)
-            # TODO: Raise Python error instead of SystemExit
-            raise SystemExit(2)
+        try:
+            assert sys.stdin.isatty()
+        except AssertionError as exc:
+            print(
+                f"rimport: need interactive TTY to authenticate as '{target_user}' (2FA).\n"
+                f"         Try: sudo -u {target_user} rimport …",
+                file=sys.stderr,
+            )
+            raise SystemExit(2) from exc
         # Re-exec under target user; this invokes sudo’s normal password/2FA flow.
         os.execvp("sudo", ["sudo", "-u", target_user, "--"] + argv)
 
-# TODO: Unused; delete.
-def safe_mvandlink(src: Path, dst: Path) -> None:
-    dst.parent.mkdir(parents=True, exist_ok=True)
-    # Move (handles cross-filesystem with copy2+remove under the hood)
-    # This preserves metadata similarly to copy2 when crossing devices.
-    moved_to = Path(shutil.move(str(src), str(final_dst)))
-    # Create the symlink at the original src path
-    link_target = str(moved_to)
-    os.symlink(link_target, src)
 
 def get_staging_root() -> Path:
-    """Return the staging root. Uses $RIMPORT_STAGING if set, otherwise
-    creates a sibling directory named '<inputdata_root>.staging'."""
+    """Return the staging root directory path.
+
+    Uses $RIMPORT_STAGING if set, otherwise returns the default staging root.
+
+    Returns:
+        Path: Resolved absolute path to the staging root directory.
+    """
     env = os.getenv("RIMPORT_STAGING")
     if env:
         return Path(env).expanduser().resolve()
-    # TODO: This should be a module-level variable.
-    return Path("/glade/campaign/collections/gdex/data/d651077/cesmdata/inputdata")
+    return DEFAULT_STAGING_ROOT
 
-    
+
 def main(argv: List[str] | None = None) -> int:
+    """Main entry point for the rimport tool.
+
+    Copies files from the CESM inputdata directory to a staging/publishing directory,
+    preserving the directory structure. Ensures the script runs as the correct user
+    (STAGE_OWNER) and handles both single files and file lists.
+
+    Args:
+        argv: Command-line arguments to parse. If None, uses sys.argv.
+
+    Returns:
+        int: Exit code (0 for success, 1 if any files had errors, 2 for fatal errors).
+
+    Environment Variables:
+        RIMPORT_SKIP_USER_CHECK: Set to "1" to skip automatic user switching.
+        RIMPORT_STAGING: Override the default staging root directory.
+
+    Exit Codes:
+        0: All files staged successfully.
+        1: One or more files failed to stage (errors printed to stderr).
+        2: Fatal error (missing inputdata directory, missing file list, etc.).
+    """
     parser = build_parser()
     args = parser.parse_args(argv)
 
-    # Ensure we are running as the cesmdata account before touching the tree
-    # Set env var RIMPORT_SKIP_USER_CHECK=1 if you prefer to run `sudox -u cesmdata rimport …`
+    # Ensure we are running as the STAGE_OWNER account before touching the tree
+    # Set env var RIMPORT_SKIP_USER_CHECK=1 if you prefer to run `sudox -u STAGE_OWNER rimport …`
     # explicitly (or for testing).
     if os.getenv("RIMPORT_SKIP_USER_CHECK") != "1":
-        ensure_running_as("cesmdata", sys.argv)
+        ensure_running_as(STAGE_OWNER, sys.argv)
 
     root = Path(args.inputdata).expanduser().resolve()
     if not root.exists():
@@ -211,7 +292,8 @@ def main(argv: List[str] | None = None) -> int:
     for p in paths:
         try:
             stage_data(p, root, staging_root)
-        except Exception as e:  # Keep CLI robust for batch runs
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            # General Exception keeps CLI robust for batch runs
             errors += 1
             print(f"rimport: error processing {p}: {e}", file=sys.stderr)
 

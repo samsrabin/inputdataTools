@@ -12,10 +12,7 @@ import logging
 import time
 from pathlib import Path
 
-DEFAULT_SOURCE_ROOT = "/glade/campaign/cesm/cesmdata/cseg/inputdata/"
-DEFAULT_TARGET_ROOT = (
-    "/glade/campaign/collections/gdex/data/d651077/cesmdata/inputdata/"
-)
+from shared import DEFAULT_INPUTDATA_ROOT, DEFAULT_STAGING_ROOT
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -131,7 +128,7 @@ def handle_non_dir(var, user_uid):
     return file_path
 
 
-def find_owned_files_scandir(item, user_uid, inputdata_root=DEFAULT_SOURCE_ROOT):
+def find_owned_files_scandir(item, user_uid, inputdata_root=DEFAULT_INPUTDATA_ROOT):
     """
     Efficiently find all files owned by a specific user using os.scandir().
 
@@ -178,7 +175,7 @@ def find_owned_files_scandir(item, user_uid, inputdata_root=DEFAULT_SOURCE_ROOT)
 
 
 def replace_files_with_symlinks(
-    item_to_process, target_dir, username, inputdata_root=DEFAULT_SOURCE_ROOT, dry_run=False
+    item_to_process, target_dir, username, inputdata_root=DEFAULT_INPUTDATA_ROOT, dry_run=False
 ):
     """
     Finds files owned by a specific user in a source directory tree,
@@ -334,19 +331,19 @@ def parse_arguments():
     parser.add_argument(
         "items_to_process",
         nargs="*",
-        default=DEFAULT_SOURCE_ROOT,
+        default=DEFAULT_INPUTDATA_ROOT,
         type=validate_paths,
         help=(
-            f"One or more (directories to search for) files (default: {DEFAULT_SOURCE_ROOT})"
+            f"One or more (directories to search for) files (default: {DEFAULT_INPUTDATA_ROOT})"
         ),
     )
     parser.add_argument(
         "--target-root",
         type=validate_directory,
-        default=DEFAULT_TARGET_ROOT,
+        default=DEFAULT_STAGING_ROOT,
         help=(
             f"The root of the directory tree where files should be moved to "
-            f"(default: {DEFAULT_TARGET_ROOT})"
+            f"(default: {DEFAULT_STAGING_ROOT})"
         ),
     )
 
@@ -356,7 +353,7 @@ def parse_arguments():
         "--inputdata-root",
         "-inputdata",  # to match rimport
         type=validate_directory,
-        default=DEFAULT_SOURCE_ROOT,
+        default=DEFAULT_INPUTDATA_ROOT,
         help=argparse.SUPPRESS,
     )
 
