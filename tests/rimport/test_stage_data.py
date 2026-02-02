@@ -82,7 +82,7 @@ class TestStageData:
         src.symlink_to(real_file)
 
         # Should raise RuntimeError for live symlink
-        with pytest.raises(RuntimeError, match="already published"):
+        with pytest.raises(RuntimeError, match="File is already published"):
             rimport.stage_data(src, inputdata_root, staging_root)
 
     def test_raises_error_for_broken_symlink(
@@ -94,7 +94,7 @@ class TestStageData:
         src.symlink_to(tmp_path / "nonexistent.nc")
 
         # Should raise RuntimeError for broken symlink
-        with pytest.raises(RuntimeError, match="broken symlink"):
+        with pytest.raises(RuntimeError, match="Source is a broken symlink"):
             rimport.stage_data(src, inputdata_root, staging_root)
 
     def test_raises_error_for_nonexistent_file(self, inputdata_root, staging_root):
