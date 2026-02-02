@@ -156,7 +156,7 @@ def stage_data(src: Path, inputdata_root: Path, staging_root: Path) -> None:
         * Raise if `src` is a broken symlink or is outside the inputdata root.
     """
     if src.is_symlink():
-        if not src.exists(follow_symlinks=True):
+        if not os.path.exists(src.resolve()):
             raise RuntimeError(f"Source is a broken symlink: {src}")
         if not src.resolve().is_relative_to(staging_root.resolve()):
             raise RuntimeError(
