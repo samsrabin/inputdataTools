@@ -6,6 +6,7 @@ import os
 import sys
 import importlib.util
 from importlib.machinery import SourceFileLoader
+from unittest.mock import patch
 
 import pytest
 
@@ -71,22 +72,30 @@ class TestStageData:
         assert dst.exists()
         assert dst.read_text() == "nested data"
 
-    def test_raises_error_for_live_symlink_already_published(
-        self, inputdata_root, staging_root
+    def test_prints_live_symlink_already_published(
+        self, inputdata_root, staging_root, capsys
     ):
         """
-        Test that staging a live, already-published symlink raises RuntimeError with accurate
-        message.
+        Test that staging a live, already-published symlink prints a message and returns
+        immediately without copying anything.
         """
-        # Create a real file and a symlink to it
+        # Create a real file in staging and a symlink to it in inputdata
         real_file = staging_root / "real_file.nc"
         real_file.write_text("data")
         src = inputdata_root / "link.nc"
         src.symlink_to(real_file)
 
-        # Should raise RuntimeError for live symlink
-        with pytest.raises(RuntimeError, match="File is already published and linked"):
+        # Mock shutil.copy2 to verify it's never called
+        with patch("shutil.copy2") as mock_copy:
+            # Should print message for live symlink and return early
             rimport.stage_data(src, inputdata_root, staging_root)
+
+            # Verify the message was printed
+            msg = "File is already published and linked"
+            assert msg in capsys.readouterr().out.strip()
+
+            # Verify that shutil.copy2 was never called (function returned early)
+            mock_copy.assert_not_called()
 
     def test_raises_error_for_live_symlink_pointing_somewhere_other_than_staging(
         self, tmp_path, inputdata_root, staging_root
