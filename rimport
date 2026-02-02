@@ -72,6 +72,9 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
 
+    # Provide -help to mirror legacy behavior
+    parser.add_argument("-help", action="help", help=argparse.SUPPRESS)
+
     return parser
 
 
