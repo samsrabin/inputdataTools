@@ -434,3 +434,44 @@ class TestRimportCommandLine:
         # Verify the right message was printed
         msg = "is outside staging directory"
         assert msg in result.stderr
+
+    def test_check_doesnt_copy(self, rimport_script, test_env, rimport_env):
+        """Test that a file is NOT copied to the staging directory if check is True."""
+        inputdata_root = test_env["inputdata_root"]
+        staging_root = test_env["staging_root"]
+
+        # Create a file in inputdata
+        test_file = inputdata_root / "test.nc"
+        test_file.write_text("test data")
+
+        # Make sure --check skips ensure_running_as()
+        del rimport_env["RIMPORT_SKIP_USER_CHECK"]
+
+        # Run rimport with --check option
+        command = [
+            sys.executable,
+            rimport_script,
+            "-file",
+            "test.nc",
+            "-inputdata",
+            str(inputdata_root),
+            "--check",
+        ]
+
+        result = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            check=False,
+            env=rimport_env,
+        )
+
+        # Verify success
+        assert result.returncode == 0, f"Command failed: {result.stderr}"
+
+        # Verify file was not staged
+        staged_file = staging_root / "test.nc"
+        assert not staged_file.exists()
+
+        # Verify message was printed
+        assert "not already published" in result.stdout

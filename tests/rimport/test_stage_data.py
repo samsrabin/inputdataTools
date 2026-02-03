@@ -57,6 +57,22 @@ class TestStageData:
         assert dst.exists()
         assert dst.read_text() == "data content"
 
+    def test_check_doesnt_copy(self, inputdata_root, staging_root, capsys):
+        """Test that a file is NOT copied to the staging directory if check is True"""
+        # Create file in inputdata root
+        src = inputdata_root / "file.nc"
+        src.write_text("data content")
+
+        # Check the file
+        rimport.stage_data(src, inputdata_root, staging_root, check=True)
+
+        # Verify file was NOT copied to staging
+        dst = staging_root / "file.nc"
+        assert not dst.exists()
+
+        # Verify message was printed
+        assert "not already published" in capsys.readouterr().out.strip()
+
     def test_preserves_directory_structure(self, inputdata_root, staging_root):
         """Test that directory structure is preserved in staging."""
         # Create nested file in inputdata root

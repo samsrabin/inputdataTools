@@ -74,6 +74,14 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
 
+    parser.add_argument(
+        "--check",
+        "-check",
+        "-c",
+        action="store_true",
+        help="Check whether file(s) is/are already published.",
+    )
+
     # Provide -help to mirror legacy behavior (in addition to -h and --help)
     parser.add_argument(
         "-h",
@@ -133,7 +141,7 @@ def normalize_paths(root: Path, relnames: Iterable[str]) -> List[Path]:
     return paths
 
 
-def stage_data(src: Path, inputdata_root: Path, staging_root: Path) -> None:
+def stage_data(src: Path, inputdata_root: Path, staging_root: Path, check: bool = False) -> None:
     """Stage a file by mirroring its path under `staging_root`.
 
     Destination path is computed by replacing the `inputdata_root` prefix of `src`
@@ -144,6 +152,7 @@ def stage_data(src: Path, inputdata_root: Path, staging_root: Path) -> None:
         src: Source file path to stage.
         inputdata_root: Root directory of the inputdata tree.
         staging_root: Root directory where files will be staged.
+        check: If True, just check whether the file is already published.
 
     Raises:
         RuntimeError: If `src` is a live symlink pointing outside staging, or if `src` is outside
@@ -167,6 +176,9 @@ def stage_data(src: Path, inputdata_root: Path, staging_root: Path) -> None:
         return
 
     # TODO: Check whether file is published but not relinked.
+    if check:
+        print(f"{INDENT}File is not already published")
+        return
 
     if not src.exists():
         raise FileNotFoundError(f"source not found: {src}")
@@ -270,7 +282,7 @@ def main(argv: List[str] | None = None) -> int:
     # Ensure we are running as the STAGE_OWNER account before touching the tree
     # Set env var RIMPORT_SKIP_USER_CHECK=1 if you prefer to run `sudox -u STAGE_OWNER rimport …`
     # explicitly (or for testing).
-    if os.getenv("RIMPORT_SKIP_USER_CHECK") != "1":
+    if not args.check and os.getenv("RIMPORT_SKIP_USER_CHECK") != "1":
         ensure_running_as(STAGE_OWNER, sys.argv)
 
     root = Path(args.inputdata).expanduser().resolve()
@@ -299,7 +311,7 @@ def main(argv: List[str] | None = None) -> int:
     for p in paths:
         print(f"'{p}':")
         try:
-            stage_data(p, root, staging_root)
+            stage_data(p, root, staging_root, args.check)
         except Exception as e:  # pylint: disable=broad-exception-caught
             # General Exception keeps CLI robust for batch runs
             errors += 1
