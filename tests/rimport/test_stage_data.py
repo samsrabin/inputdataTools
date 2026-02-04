@@ -222,7 +222,7 @@ class TestStageData:
             rimport.stage_data(src, inputdata_root, staging_root)
 
     def test_raises_error_for_already_published_file(
-        self, tmp_path, inputdata_root, staging_root
+        self, inputdata_root, staging_root
     ):
         """Test that staging an already published file raises RuntimeError."""
         # Create a file in staging_root
