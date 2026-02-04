@@ -84,6 +84,19 @@ class TestBuildParser:
         args = parser.parse_args(["-file", "test.txt"])
         assert args.inputdata == rimport.DEFAULT_INPUTDATA_ROOT
 
+    def test_check_default(self):
+        """Test that --check has the correct default value."""
+        parser = rimport.build_parser()
+        args = parser.parse_args(["-file", "test.txt"])
+        assert args.check is False
+
+    @pytest.mark.parametrize("check_flag", ["-check", "-c", "--check"])
+    def test_check_arguments_accepted(self, check_flag):
+        """Test that all check argument flags are accepted."""
+        parser = rimport.build_parser()
+        args = parser.parse_args(["-file", "test.txt", check_flag])
+        assert args.check is True
+
     def test_inputdata_custom(self):
         """Test that -inputdata can be customized."""
         parser = rimport.build_parser()

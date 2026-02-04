@@ -6,6 +6,7 @@ import os
 import sys
 import importlib.util
 from importlib.machinery import SourceFileLoader
+from unittest.mock import patch
 
 import pytest
 
@@ -56,6 +57,22 @@ class TestStageData:
         assert dst.exists()
         assert dst.read_text() == "data content"
 
+    def test_check_doesnt_copy(self, inputdata_root, staging_root, capsys):
+        """Test that a file is NOT copied to the staging directory if check is True"""
+        # Create file in inputdata root
+        src = inputdata_root / "file.nc"
+        src.write_text("data content")
+
+        # Check the file
+        rimport.stage_data(src, inputdata_root, staging_root, check=True)
+
+        # Verify file was NOT copied to staging
+        dst = staging_root / "file.nc"
+        assert not dst.exists()
+
+        # Verify message was printed
+        assert "not already published" in capsys.readouterr().out.strip()
+
     def test_preserves_directory_structure(self, inputdata_root, staging_root):
         """Test that directory structure is preserved in staging."""
         # Create nested file in inputdata root
@@ -71,18 +88,120 @@ class TestStageData:
         assert dst.exists()
         assert dst.read_text() == "nested data"
 
-    def test_raises_error_for_live_symlink(
+    def test_prints_live_symlink_already_published_not_downloadable(
+        self, inputdata_root, staging_root, capsys
+    ):
+        """
+        Test that staging a live, already-published symlink prints a message and returns
+        immediately without copying anything. Should say it's not available for download.
+        """
+        # Create a real file in staging and a symlink to it in inputdata
+        real_file = staging_root / "real_file.nc"
+        real_file.write_text("data")
+        src = inputdata_root / "link.nc"
+        src.symlink_to(real_file)
+
+        # Mock shutil.copy2 to verify it's never called
+        with patch("shutil.copy2") as mock_copy:
+            # Should print message for live symlink and return early
+            rimport.stage_data(src, inputdata_root, staging_root)
+
+            # Verify the right messages were printed
+            stdout = capsys.readouterr().out.strip()
+            msg = "File is already published and linked"
+            assert msg in stdout
+            msg = "File is not (yet) available for download"
+            assert msg in stdout
+
+            # Verify the WRONG message was NOT printed
+            msg = "is already under staging directory"
+            assert msg not in stdout
+
+            # Verify that shutil.copy2 was never called (function returned early)
+            mock_copy.assert_not_called()
+
+    def test_prints_live_symlink_already_published_is_downloadable(
+        self, inputdata_root, staging_root, capsys
+    ):
+        """
+        Like test_prints_live_symlink_already_published_not_downloadable, but mocks
+        can_file_be_downloaded() to test "is available for download" message.
+        """
+        # Create a real file in staging and a symlink to it in inputdata
+        real_file = staging_root / "real_file.nc"
+        real_file.write_text("data")
+        src = inputdata_root / "link.nc"
+        src.symlink_to(real_file)
+
+        # Mock shutil.copy2 to verify it's never called
+        with patch("shutil.copy2") as mock_copy:
+            # Mock can_file_be_downloaded to return True
+            with patch("rimport.can_file_be_downloaded", return_value=True):
+                # Should print message for live symlink and return early
+                rimport.stage_data(src, inputdata_root, staging_root)
+
+                # Verify that shutil.copy2 was never called (function returned early)
+                mock_copy.assert_not_called()
+
+        # Verify the right messages were printed
+        stdout = capsys.readouterr().out.strip()
+        msg = "File is already published and linked"
+        assert msg in stdout
+        msg = "File is available for download"
+        assert msg in stdout
+
+        # Verify the WRONG message was NOT printed
+        msg = "is already under staging directory"
+        assert msg not in stdout
+
+    def test_prints_published_but_not_linked(
+        self, inputdata_root, staging_root, capsys
+    ):
+        """
+        Tests printed message for when a file has been published (copied to staging root) but not
+        yet linked (inputdata version replaced with symlink to staging version).
+        """
+        # Create a real file in staging AND in inputdata
+        filename = "real_file.nc"
+        staged = staging_root / filename
+        staged.write_text("data")
+        inputdata = inputdata_root / filename
+        inputdata.write_text("data")
+
+        # Mock shutil.copy2 to verify it's never called
+        with patch("shutil.copy2") as mock_copy:
+            # Mock can_file_be_downloaded to return True
+            with patch("rimport.can_file_be_downloaded", return_value=True):
+                # Should print message for live symlink and return early
+                rimport.stage_data(inputdata, inputdata_root, staging_root)
+
+                # Verify that shutil.copy2 was never called (function returned early)
+                mock_copy.assert_not_called()
+
+        # Verify the right messages were printed or not
+        stdout = capsys.readouterr().out.strip()
+        msg = "File is already published and linked"
+        assert msg not in stdout
+        msg = "File is already published but NOT linked; do"
+        assert msg in stdout
+        msg = "File is available for download"
+        assert msg in stdout
+
+    def test_raises_error_for_live_symlink_pointing_somewhere_other_than_staging(
         self, tmp_path, inputdata_root, staging_root
     ):
-        """Test that staging a live symlink raises RuntimeError."""
-        # Create a real file and a symlink to it
+        """
+        Test that staging a live symlink that points to somewhere other than staging directory
+        raises RuntimeError with accurate message.
+        """
+        # Create a real file outside the staging directory and a symlink to it
         real_file = tmp_path / "real_file.nc"
         real_file.write_text("data")
         src = inputdata_root / "link.nc"
         src.symlink_to(real_file)
 
         # Should raise RuntimeError for live symlink
-        with pytest.raises(RuntimeError, match="already published"):
+        with pytest.raises(RuntimeError, match="outside staging directory"):
             rimport.stage_data(src, inputdata_root, staging_root)
 
     def test_raises_error_for_broken_symlink(
@@ -94,7 +213,7 @@ class TestStageData:
         src.symlink_to(tmp_path / "nonexistent.nc")
 
         # Should raise RuntimeError for broken symlink
-        with pytest.raises(RuntimeError, match="broken symlink"):
+        with pytest.raises(RuntimeError, match="Source is a broken symlink"):
             rimport.stage_data(src, inputdata_root, staging_root)
 
     def test_raises_error_for_nonexistent_file(self, inputdata_root, staging_root):
@@ -136,7 +255,7 @@ class TestStageData:
             rimport.stage_data(src, inputdata_root, staging_root)
 
     def test_raises_error_for_already_published_file(
-        self, tmp_path, inputdata_root, staging_root
+        self, inputdata_root, staging_root
     ):
         """Test that staging an already published file raises RuntimeError."""
         # Create a file in staging_root
