@@ -154,6 +154,39 @@ class TestStageData:
         msg = "is already under staging directory"
         assert msg not in stdout
 
+    def test_prints_published_but_not_linked(
+        self, inputdata_root, staging_root, capsys
+    ):
+        """
+        Tests printed message for when a file has been published (copied to staging root) but not
+        yet linked (inputdata version replaced with symlink to staging version).
+        """
+        # Create a real file in staging AND in inputdata
+        filename = "real_file.nc"
+        staged = staging_root / filename
+        staged.write_text("data")
+        inputdata = inputdata_root / filename
+        inputdata.write_text("data")
+
+        # Mock shutil.copy2 to verify it's never called
+        with patch("shutil.copy2") as mock_copy:
+            # Mock can_file_be_downloaded to return True
+            with patch("rimport.can_file_be_downloaded", return_value=True):
+                # Should print message for live symlink and return early
+                rimport.stage_data(inputdata, inputdata_root, staging_root)
+
+                # Verify that shutil.copy2 was never called (function returned early)
+                mock_copy.assert_not_called()
+
+        # Verify the right messages were printed or not
+        stdout = capsys.readouterr().out.strip()
+        msg = "File is already published and linked"
+        assert msg not in stdout
+        msg = "File is already published but NOT linked; do"
+        assert msg in stdout
+        msg = "File is available for download"
+        assert msg in stdout
+
     def test_raises_error_for_live_symlink_pointing_somewhere_other_than_staging(
         self, tmp_path, inputdata_root, staging_root
     ):

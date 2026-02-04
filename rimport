@@ -178,15 +178,9 @@ def stage_data(
                 f"({staging_root})"
             )
         print(f"{INDENT}File is already published and linked.")
-        if can_file_be_downloaded(src.resolve(), staging_root):
-            print(f"{INDENT}File is available for download.")
-        else:
-            print(f"{INDENT}File is not (yet) available for download.")
-        return
-
-    # TODO: Check whether file is published but not relinked.
-    if check:
-        print(f"{INDENT}File is not already published")
+        print_can_file_be_downloaded(
+            can_file_be_downloaded(src.resolve(), staging_root)
+        )
         return
 
     if not src.exists():
@@ -204,6 +198,20 @@ def stage_data(
         ) from exc
 
     dst = staging_root / rel
+
+    if dst.exists():
+        print(f"{INDENT}File is already published but NOT linked; do")
+        print(f"{2*INDENT}relink.py {rel}")
+        print(f"{INDENT}to resolve.")
+        print_can_file_be_downloaded(
+            can_file_be_downloaded(rel, staging_root)
+        )
+        return
+
+    if check:
+        print(f"{INDENT}File is not already published")
+        return
+
     dst.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(src, dst)
     print(f"{INDENT}[rimport] staged {src} -> {dst}")
@@ -293,6 +301,18 @@ def can_file_be_downloaded(file_relpath: Path, staging_root: Path, timeout: floa
     except HTTPError:
         # Server reached, but resource doesn't exist (404, 410, etc.)
         return False
+
+
+def print_can_file_be_downloaded(file_can_be_downloaded: bool):
+    """Print a message indicating whether a file is available for download.
+
+    Args:
+        file_can_be_downloaded: Boolean indicating if the file can be downloaded.
+    """
+    if file_can_be_downloaded:
+        print(f"{INDENT}File is available for download.")
+    else:
+        print(f"{INDENT}File is not (yet) available for download.")
 
 
 def main(argv: List[str] | None = None) -> int:
