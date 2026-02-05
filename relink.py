@@ -162,9 +162,7 @@ def find_owned_files_scandir(item, user_uid, inputdata_root=DEFAULT_INPUTDATA_RO
                         )
 
                     # Things other than directories are handled separately
-                    elif (
-                        entry_path := handle_non_dir(entry, user_uid)
-                    ) is not None:
+                    elif (entry_path := handle_non_dir(entry, user_uid)) is not None:
                         yield entry_path
 
                 except (OSError, PermissionError) as e:
@@ -219,13 +217,15 @@ def replace_files_with_symlinks(
     )
 
     # Use efficient scandir-based search
-    for file_path in find_owned_files_scandir(item_to_process, user_uid, inputdata_root):
-        replace_one_file_with_symlink(inputdata_root, target_dir, file_path, dry_run=dry_run)
+    for file_path in find_owned_files_scandir(
+        item_to_process, user_uid, inputdata_root
+    ):
+        replace_one_file_with_symlink(
+            inputdata_root, target_dir, file_path, dry_run=dry_run
+        )
 
 
-def replace_one_file_with_symlink(
-    inputdata_root, target_dir, file_path, dry_run=False
-):
+def replace_one_file_with_symlink(inputdata_root, target_dir, file_path, dry_run=False):
     """
     Given a file, replaces it with a symbolic link to the same relative path in a target directory
     tree.
@@ -400,7 +400,9 @@ def process_args(args):
     args.log_level = get_log_level(quiet=args.quiet, verbose=args.verbose)
 
     # Ensure that items_to_process is a list
-    if hasattr(args, "items_to_process") and not isinstance(args.items_to_process, list):
+    if hasattr(args, "items_to_process") and not isinstance(
+        args.items_to_process, list
+    ):
         args.items_to_process = [args.items_to_process]
 
     # Check that everything is an absolute path (should have been converted, if needed, during
