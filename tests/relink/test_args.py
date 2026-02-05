@@ -193,6 +193,17 @@ class TestParseArguments:
             assert str(source2.resolve()) in args.items_to_process
             assert args.target_root == str(target.resolve())
 
+    @pytest.mark.parametrize(
+        "inputdata_flag",
+        ["-inputdata", "-i", "--inputdata", "--inputdata-root", "-inputdata-root"],
+    )
+    def test_inputdata_arguments_accepted(self, temp_dirs, inputdata_flag):
+        """Test that all inputdata argument flags are accepted."""
+        inputdata_root, _ = temp_dirs
+        with patch("sys.argv", ["relink.py", inputdata_flag, inputdata_root]):
+            args = relink.parse_arguments()
+            assert args.inputdata_root == inputdata_root
+
 
 class TestValidateDirectory:
     """Test suite for validate_directory function."""

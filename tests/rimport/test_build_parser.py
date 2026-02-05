@@ -48,7 +48,7 @@ class TestBuildParser:
         assert args.filelist == "files.txt"
         assert args.file is None
 
-    @pytest.mark.parametrize("inputdata_flag", ["-inputdata", "-i", "--inputdata"])
+    @pytest.mark.parametrize("inputdata_flag", ["-inputdata", "-i", "--inputdata", "--inputdata-root", "-inputdata-root"])
     def test_inputdata_arguments_accepted(self, inputdata_flag):
         """Test that all inputdata argument flags are accepted."""
         parser = rimport.build_parser()

@@ -70,8 +70,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     parser.add_argument(
+        "--inputdata-root",
+        "-inputdata-root",
         "--inputdata",
         "-inputdata",
+        "-i",
         dest="inputdata_root",
         metavar="inputdata_dir",
         default=DEFAULT_INPUTDATA_ROOT,

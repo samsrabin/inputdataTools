@@ -360,7 +360,10 @@ def parse_arguments():
     # ONLY INTENDED FOR USE IN TESTING
     parser.add_argument(
         "--inputdata-root",
-        "-inputdata",  # to match rimport
+        "-inputdata-root",
+        "--inputdata",
+        "-inputdata",
+        "-i",
         type=validate_directory,
         default=DEFAULT_INPUTDATA_ROOT,
         help=argparse.SUPPRESS,
