@@ -5,6 +5,7 @@ Tests for build_parser() function in rimport script.
 import os
 import sys
 import argparse
+from pathlib import Path
 import importlib.util
 from importlib.machinery import SourceFileLoader
 
@@ -49,12 +50,12 @@ class TestBuildParser:
         assert args.file is None
 
     @pytest.mark.parametrize("inputdata_flag", ["-inputdata", "-i", "--inputdata", "--inputdata-root", "-inputdata-root"])
-    def test_inputdata_arguments_accepted(self, inputdata_flag):
+    def test_inputdata_arguments_accepted(self, temp_dirs, inputdata_flag):
         """Test that all inputdata argument flags are accepted."""
+        inputdata_root, _ = temp_dirs
         parser = rimport.build_parser()
-        inputdata_dir = "/some/dir"
-        args = parser.parse_args([inputdata_flag, inputdata_dir, "-f", "dummy_file.nc"])
-        assert args.inputdata_root == inputdata_dir
+        args = parser.parse_args([inputdata_flag, inputdata_root, "-f", "dummy_file.nc"])
+        assert args.inputdata_root == inputdata_root
 
     def test_file_and_list_mutually_exclusive(self, capsys):
         """Test that -file and -list cannot be used together."""
@@ -82,7 +83,7 @@ class TestBuildParser:
         """Test that -inputdata has correct default value."""
         parser = rimport.build_parser()
         args = parser.parse_args(["-file", "test.txt"])
-        assert args.inputdata_root == rimport.DEFAULT_INPUTDATA_ROOT
+        assert args.inputdata_root == str(rimport.DEFAULT_INPUTDATA_ROOT)
 
     def test_check_default(self):
         """Test that --check has the correct default value."""
@@ -97,10 +98,12 @@ class TestBuildParser:
         args = parser.parse_args(["-file", "test.txt", check_flag])
         assert args.check is True
 
-    def test_inputdata_custom(self):
+    def test_inputdata_custom(self, temp_dirs):
         """Test that -inputdata can be customized."""
         parser = rimport.build_parser()
-        custom_path = "/custom/path"
+        inputdata_root, _ = temp_dirs
+        custom_path = os.path.join(inputdata_root, "custom", "path")
+        os.makedirs(custom_path)
         args = parser.parse_args(["-file", "test.txt", "-inputdata", custom_path])
         assert args.inputdata_root == custom_path
 
@@ -113,19 +116,25 @@ class TestBuildParser:
         # Help should exit with code 0
         assert exc_info.value.code == 0
 
-    def test_file_with_inputdata(self):
+    def test_file_with_inputdata(self, temp_dirs):
         """Test combining -file with -inputdata."""
         parser = rimport.build_parser()
-        args = parser.parse_args(["-file", "data.nc", "-inputdata", "/my/data"])
+        inputdata_root, _ = temp_dirs
+        custom_path = os.path.join(inputdata_root, "custom", "path2")
+        os.makedirs(custom_path)
+        args = parser.parse_args(["-file", "data.nc", "-inputdata", custom_path])
         assert args.file == "data.nc"
-        assert args.inputdata_root == "/my/data"
+        assert args.inputdata_root == custom_path
 
-    def test_list_with_inputdata(self):
+    def test_list_with_inputdata(self, temp_dirs):
         """Test combining -list with -inputdata."""
         parser = rimport.build_parser()
-        args = parser.parse_args(["-list", "files.txt", "-inputdata", "/my/data"])
+        inputdata_root, _ = temp_dirs
+        custom_path = os.path.join(inputdata_root, "custom", "path3")
+        os.makedirs(custom_path)
+        args = parser.parse_args(["-list", "files.txt", "-inputdata", custom_path])
         assert args.filelist == "files.txt"
-        assert args.inputdata_root == "/my/data"
+        assert args.inputdata_root == custom_path
 
     def test_quiet_default(self):
         """Test that quiet defaults to False."""

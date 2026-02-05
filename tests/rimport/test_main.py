@@ -9,6 +9,7 @@ import os
 import importlib.util
 from importlib.machinery import SourceFileLoader
 from unittest.mock import patch, call
+import pytest
 
 # pylint: disable=too-many-arguments,too-many-positional-arguments
 
@@ -156,14 +157,15 @@ class TestMain:
     def test_nonexistent_inputdata_directory(
         self, _mock_ensure_running_as, tmp_path, capsys
     ):
-        """Test that main() returns error code 2 for nonexistent inputdata directory."""
+        """Test that argument parser rejects nonexistent inputdata directory."""
         nonexistent = tmp_path / "nonexistent"
 
-        result = rimport.main(["-file", "test.nc", "-inputdata", str(nonexistent)])
+        with pytest.raises(SystemExit) as exc_info:
+            rimport.main(["-file", "test.nc", "-inputdata", str(nonexistent)])
 
-        assert result == 2
+        assert exc_info.value.code == 2
         captured = capsys.readouterr()
-        assert "inputdata directory does not exist" in captured.err
+        assert "does not exist" in captured.err
 
     @patch.object(rimport, "ensure_running_as")
     def test_nonexistent_filelist(self, _mock_ensure_running_as, tmp_path, capsys):
