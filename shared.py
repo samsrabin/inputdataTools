@@ -3,7 +3,8 @@ Things shared between rimport and relink
 """
 
 import logging
-from argparse import ArgumentParser
+import argparse
+import os
 
 DEFAULT_INPUTDATA_ROOT = "/glade/campaign/cesm/cesmdata/cseg/inputdata/"
 DEFAULT_STAGING_ROOT = (
@@ -31,7 +32,7 @@ def get_log_level(quiet: bool = False, verbose: bool = False) -> int:
     return logging.INFO
 
 
-def add_parser_verbosity_group(parser: ArgumentParser):
+def add_parser_verbosity_group(parser: argparse.ArgumentParser):
     """Add mutually exclusive verbosity options to an argument parser.
 
     Adds -v/--verbose and -q/--quiet flags as a mutually exclusive group.
@@ -53,3 +54,45 @@ def add_parser_verbosity_group(parser: ArgumentParser):
         help="Quiet mode (show only warnings and errors)",
     )
     return verbosity_group
+
+
+def validate_paths(path, check_is_dir=False):
+    """
+    Validate that one or more paths exist.
+
+    Args:
+        path (str or list): The path to validate, or a list of such paths.
+
+    Returns:
+        str or list: The absolute path(s) if valid.
+
+    Raises:
+        argparse.ArgumentTypeError: If a path doesn't exist.
+    """
+    if isinstance(path, list):
+        result = []
+        for item in path:
+            result.append(validate_paths(item, check_is_dir=check_is_dir))
+        return result
+
+    if not os.path.exists(path):
+        raise argparse.ArgumentTypeError(f"'{path}' does not exist")
+    if check_is_dir and not os.path.isdir(path):
+        raise argparse.ArgumentTypeError(f"'{path}' is not a directory")
+    return os.path.abspath(path)
+
+
+def validate_directory(path):
+    """
+    Validate that one or more directories exist.
+
+    Args:
+        path (str or list): The directory to validate, or a list of such directories.
+
+    Returns:
+        str or list: The absolute path(s) if valid.
+
+    Raises:
+        argparse.ArgumentTypeError: If a path doesn't exist.
+    """
+    return validate_paths(path, check_is_dir=True)

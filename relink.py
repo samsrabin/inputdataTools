@@ -17,6 +17,8 @@ from shared import (
     DEFAULT_STAGING_ROOT,
     get_log_level,
     add_parser_verbosity_group,
+    validate_paths,
+    validate_directory,
 )
 
 # Set up logger
@@ -280,48 +282,6 @@ def replace_one_file_with_symlink(inputdata_root, target_dir, file_path, dry_run
     except OSError as e:
         os.rename(link_name + ".tmp", link_name)
         logger.error("Error creating symlink for %s: %s. Skipping.", link_name, e)
-
-
-def validate_paths(path, check_is_dir=False):
-    """
-    Validate that one or more paths exist.
-
-    Args:
-        path (str or list): The path to validate, or a list of such paths.
-
-    Returns:
-        str or list: The absolute path(s) if valid.
-
-    Raises:
-        argparse.ArgumentTypeError: If a path doesn't exist.
-    """
-    if isinstance(path, list):
-        result = []
-        for item in path:
-            result.append(validate_paths(item, check_is_dir=check_is_dir))
-        return result
-
-    if not os.path.exists(path):
-        raise argparse.ArgumentTypeError(f"'{path}' does not exist")
-    if check_is_dir and not os.path.isdir(path):
-        raise argparse.ArgumentTypeError(f"'{path}' is not a directory")
-    return os.path.abspath(path)
-
-
-def validate_directory(path):
-    """
-    Validate that one or more directories exist.
-
-    Args:
-        path (str or list): The directory to validate, or a list of such directories.
-
-    Returns:
-        str or list: The absolute path(s) if valid.
-
-    Raises:
-        argparse.ArgumentTypeError: If a path doesn't exist.
-    """
-    return validate_paths(path, check_is_dir=True)
 
 
 def parse_arguments():
