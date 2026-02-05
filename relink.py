@@ -12,7 +12,12 @@ import logging
 import time
 from pathlib import Path
 
-from shared import DEFAULT_INPUTDATA_ROOT, DEFAULT_STAGING_ROOT, get_log_level
+from shared import (
+    DEFAULT_INPUTDATA_ROOT,
+    DEFAULT_STAGING_ROOT,
+    get_log_level,
+    add_parser_verbosity_group,
+)
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -175,7 +180,11 @@ def find_owned_files_scandir(item, user_uid, inputdata_root=DEFAULT_INPUTDATA_RO
 
 
 def replace_files_with_symlinks(
-    item_to_process, target_dir, username, inputdata_root=DEFAULT_INPUTDATA_ROOT, dry_run=False
+    item_to_process,
+    target_dir,
+    username,
+    inputdata_root=DEFAULT_INPUTDATA_ROOT,
+    dry_run=False,
 ):
     """
     Finds files owned by a specific user in a source directory tree,
@@ -357,17 +366,8 @@ def parse_arguments():
         help=argparse.SUPPRESS,
     )
 
-    # Verbosity options (mutually exclusive)
-    verbosity_group = parser.add_mutually_exclusive_group()
-    verbosity_group.add_argument(
-        "-v", "--verbose", action="store_true", help="Enable verbose output"
-    )
-    verbosity_group.add_argument(
-        "-q",
-        "--quiet",
-        action="store_true",
-        help="Quiet mode (show only warnings and errors)",
-    )
+    # Add verbosity options
+    add_parser_verbosity_group(parser)
 
     parser.add_argument(
         "--dry-run",
