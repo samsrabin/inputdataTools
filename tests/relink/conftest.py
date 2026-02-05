@@ -18,7 +18,9 @@ def fixture_temp_dirs():
 
     with patch("relink.DEFAULT_INPUTDATA_ROOT", source_dir):
         with patch("relink.DEFAULT_STAGING_ROOT", target_dir):
-            yield source_dir, target_dir
+            with patch("shared.DEFAULT_INPUTDATA_ROOT", source_dir):
+                with patch("shared.DEFAULT_STAGING_ROOT", target_dir):
+                    yield source_dir, target_dir
 
     # Cleanup
     shutil.rmtree(source_dir, ignore_errors=True)

@@ -32,6 +32,27 @@ def get_log_level(quiet: bool = False, verbose: bool = False) -> int:
     return logging.INFO
 
 
+def add_inputdata_root(parser: argparse.ArgumentParser):
+    """Add inputdata_root option to an argument parser.
+
+    The root of the directory tree containing CESM input data. Only intended for use in testing, so
+    help is suppressed.
+
+    Args:
+        parser: ArgumentParser instance to add the inputdata_root arg to.
+    """
+    parser.add_argument(
+        "--inputdata-root",
+        "-inputdata-root",
+        "--inputdata",
+        "-inputdata",
+        "-i",
+        type=validate_directory,
+        default=DEFAULT_INPUTDATA_ROOT,
+        help=argparse.SUPPRESS,
+    )
+
+
 def add_parser_verbosity_group(parser: argparse.ArgumentParser):
     """Add mutually exclusive verbosity options to an argument parser.
 

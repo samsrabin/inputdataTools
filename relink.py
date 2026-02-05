@@ -17,6 +17,7 @@ from shared import (
     DEFAULT_STAGING_ROOT,
     get_log_level,
     add_parser_verbosity_group,
+    add_inputdata_root,
     validate_paths,
     validate_directory,
 )
@@ -316,18 +317,8 @@ def parse_arguments():
         ),
     )
 
-    # The root of the directory tree containing CESM input data.
-    # ONLY INTENDED FOR USE IN TESTING
-    parser.add_argument(
-        "--inputdata-root",
-        "-inputdata-root",
-        "--inputdata",
-        "-inputdata",
-        "-i",
-        type=validate_directory,
-        default=DEFAULT_INPUTDATA_ROOT,
-        help=argparse.SUPPRESS,
-    )
+    # Add inputdata_root option flags
+    add_inputdata_root(parser)
 
     # Add verbosity options
     add_parser_verbosity_group(parser)
