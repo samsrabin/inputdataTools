@@ -327,7 +327,7 @@ def print_can_file_be_downloaded(file_can_be_downloaded: bool):
         logger.info("%sFile is not (yet) available for download.", INDENT)
 
 
-def configure_logging(log_level: int = logging.INFO) -> None:
+def configure_logging(log_level: int) -> None:
     """Configure logging to send INFO/WARNING to stdout and ERROR/CRITICAL to stderr.
 
     Sets up two handlers:
@@ -337,7 +337,7 @@ def configure_logging(log_level: int = logging.INFO) -> None:
     Both handlers use simple message-only formatting without timestamps or level names.
 
     Args:
-        log_level: Minimum logging level (DEBUG, INFO, or WARNING). Default is INFO.
+        log_level: Minimum logging level (DEBUG, INFO, or WARNING).
     """
     logger.setLevel(log_level)
 
