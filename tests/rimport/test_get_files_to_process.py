@@ -87,7 +87,7 @@ class TestGetRelnamesToProcess:
 
         filelist = tmp_path / "file_list.txt"
         filelist.write_text("\n".join(filenames), encoding="utf8")
-        filelist_relpath = filelist.relative_to(os.getcwd(), walk_up=True)
+        filelist_relpath = os.path.relpath(filelist)
 
         # Run
         files_to_process, result = rimport.get_files_to_process(
@@ -144,7 +144,7 @@ class TestGetRelnamesToProcess:
 
         filelist = tmp_path / "file_list.txt"
         filelist.write_text("\n".join(filenames), encoding="utf8")
-        filelist_relpath = filelist.relative_to(os.getcwd(), walk_up=True)
+        filelist_relpath = os.path.relpath(filelist)
 
         # Run
         files_to_process, result = rimport.get_files_to_process(
