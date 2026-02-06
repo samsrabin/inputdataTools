@@ -39,7 +39,9 @@ class TestGetRelnamesToProcess:
 
         # Run
         files_to_process, result = rimport.get_files_to_process(
-            file=filename, filelist=None, items_to_process=None,
+            file=filename,
+            filelist=None,
+            items_to_process=None,
         )
 
         # Verify
@@ -60,7 +62,9 @@ class TestGetRelnamesToProcess:
 
         # Run
         files_to_process, result = rimport.get_files_to_process(
-            file=test_file, filelist=None, items_to_process=None,
+            file=test_file,
+            filelist=None,
+            items_to_process=None,
         )
 
         # Verify
@@ -87,7 +91,9 @@ class TestGetRelnamesToProcess:
 
         # Run
         files_to_process, result = rimport.get_files_to_process(
-            file=None, filelist=filelist_relpath, items_to_process=None,
+            file=None,
+            filelist=filelist_relpath,
+            items_to_process=None,
         )
 
         # Verify
@@ -113,7 +119,9 @@ class TestGetRelnamesToProcess:
 
         # Run
         files_to_process, result = rimport.get_files_to_process(
-            file=None, filelist=filelist, items_to_process=None,
+            file=None,
+            filelist=filelist,
+            items_to_process=None,
         )
 
         # Verify
@@ -140,7 +148,9 @@ class TestGetRelnamesToProcess:
 
         # Run
         files_to_process, result = rimport.get_files_to_process(
-            file=None, filelist=filelist_relpath, items_to_process=None,
+            file=None,
+            filelist=filelist_relpath,
+            items_to_process=None,
         )
 
         # Verify
@@ -166,7 +176,9 @@ class TestGetRelnamesToProcess:
 
         # Run
         files_to_process, result = rimport.get_files_to_process(
-            file=None, filelist=filelist, items_to_process=None,
+            file=None,
+            filelist=filelist,
+            items_to_process=None,
         )
 
         # Verify
@@ -178,7 +190,9 @@ class TestGetRelnamesToProcess:
         filelist = "bsfearirn"
         assert not os.path.exists(filelist)
         files_to_process, result = rimport.get_files_to_process(
-            file=None, filelist=filelist, items_to_process=None,
+            file=None,
+            filelist=filelist,
+            items_to_process=None,
         )
         assert result == 2
         assert files_to_process is None
@@ -188,7 +202,9 @@ class TestGetRelnamesToProcess:
         filelist = tmp_path / "bsfearirn"
         filelist.write_text("")
         files_to_process, result = rimport.get_files_to_process(
-            file=None, filelist=filelist, items_to_process=[],
+            file=None,
+            filelist=filelist,
+            items_to_process=[],
         )
         assert result == 2
         assert files_to_process is None
@@ -209,7 +225,9 @@ class TestGetRelnamesToProcess:
 
         # Run
         files_to_process, result = rimport.get_files_to_process(
-            file=None, filelist=None, items_to_process=filenames,
+            file=None,
+            filelist=None,
+            items_to_process=filenames,
         )
 
         # Verify
@@ -230,7 +248,9 @@ class TestGetRelnamesToProcess:
 
         # Run
         files_to_process, result = rimport.get_files_to_process(
-            file=None, filelist=None, items_to_process=filenames,
+            file=None,
+            filelist=None,
+            items_to_process=filenames,
         )
 
         # Verify
@@ -256,7 +276,9 @@ class TestGetRelnamesToProcess:
 
         # Run
         files_to_process, result = rimport.get_files_to_process(
-            file=None, filelist=None, items_to_process=filenames,
+            file=None,
+            filelist=None,
+            items_to_process=filenames,
         )
 
         # Verify
@@ -286,7 +308,9 @@ class TestGetRelnamesToProcess:
 
         # Run
         files_to_process, result = rimport.get_files_to_process(
-            file=filename, filelist=filelist, items_to_process=None,
+            file=filename,
+            filelist=filelist,
+            items_to_process=None,
         )
 
         # Verify
@@ -297,7 +321,9 @@ class TestGetRelnamesToProcess:
         """Test that at least one of file, filelist, items_to_process is required"""
         # Run
         files_to_process, result = rimport.get_files_to_process(
-            file=None, filelist=None, items_to_process=None,
+            file=None,
+            filelist=None,
+            items_to_process=None,
         )
 
         # Verify

@@ -204,16 +204,12 @@ class TestMain:
         assert "no filenames found in list" in captured.err
 
     @patch.object(rimport, "ensure_running_as")
-    def test_requires_file_or_filelist(
-        self, _mock_ensure_running_as, tmp_path, capsys
-    ):
+    def test_requires_file_or_filelist(self, _mock_ensure_running_as, tmp_path, capsys):
         """Test that main() returns error code 2 if neither file nor filelist provided."""
         inputdata_root = tmp_path / "inputdata"
         inputdata_root.mkdir()
 
-        result = rimport.main(
-            ["-inputdata", str(inputdata_root)]
-        )
+        result = rimport.main(["-inputdata", str(inputdata_root)])
 
         assert result == 2
         captured = capsys.readouterr()

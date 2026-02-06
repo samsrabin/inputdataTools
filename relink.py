@@ -282,7 +282,9 @@ def replace_one_file_with_symlink(inputdata_root, target_dir, file_path, dry_run
         logger.info("%sCreated symbolic link: %s -> %s", INDENT, link_name, link_target)
     except OSError as e:
         os.rename(link_name + ".tmp", link_name)
-        logger.error("%sError creating symlink for %s: %s. Skipping.", INDENT, link_name, e)
+        logger.error(
+            "%sError creating symlink for %s: %s. Skipping.", INDENT, link_name, e
+        )
 
 
 def parse_arguments():
