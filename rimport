@@ -18,6 +18,8 @@ from typing import Iterable, List
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError
 
+from relink import replace_one_file_with_symlink
+
 import shared
 INDENT = shared.INDENT
 
@@ -143,10 +145,24 @@ def normalize_paths(root: Path, relnames: Iterable[str]) -> List[Path]:
     return paths
 
 
+def check_relink_worked(src: Path, dst: Path) -> None:
+    """Check whether relink worked
+
+    Args:
+        src (Path): Source file (should have been converted to symlink)
+        dst (Path): Destination file (symlink target)
+
+    Raises:
+        RuntimeError: If src is not a symlink pointing to dst.
+    """
+    if not (src.is_symlink() and src.resolve() == dst):
+        raise RuntimeError("Error relinking during rimport")
+
+
 def stage_data(
     src: Path, inputdata_root: Path, staging_root: Path, check: bool = False
 ) -> None:
-    """Stage a file by mirroring its path under `staging_root`.
+    """Stage a file by mirroring its path under `staging_root`, then replace with symlink to staged.
 
     Destination path is computed by replacing the `inputdata_root` prefix of `src`
     with `staging_root`, i.e.:
@@ -162,6 +178,7 @@ def stage_data(
         RuntimeError: If `src` is a live symlink pointing outside staging, or if `src` is outside
                       the inputdata root, or if `src` is already under staging directory.
         RuntimeError: If `src` is a broken symlink.
+        RuntimeError: If it failed to replace `src` with a symlink to the staged file.
         FileNotFoundError: If `src` does not exist.
 
     Guardrails:
@@ -199,19 +216,24 @@ def stage_data(
     dst = staging_root / rel
 
     if dst.exists():
-        logger.info("%sFile is already published but NOT linked; do", INDENT)
-        logger.info("%srelink.py %s", 2 * INDENT, rel)
-        logger.info("%sto resolve.", INDENT)
+        logger.info("File is already published but NOT linked; linking now.")
+        replace_one_file_with_symlink(inputdata_root, staging_root, str(src))
         print_can_file_be_downloaded(can_file_be_downloaded(rel, staging_root))
+        check_relink_worked(src, dst)
         return
 
     if check:
         logger.info("%sFile is not already published", INDENT)
         return
 
+    # Copy file to destination
     dst.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(src, dst)
     logger.info("%s[rimport] staged %s -> %s", INDENT, src, dst)
+
+    # Replace original with symlink to destination
+    replace_one_file_with_symlink(inputdata_root, staging_root, str(src))
+    check_relink_worked(src, dst)
 
 
 def ensure_running_as(target_user: str, argv: list[str]) -> None:

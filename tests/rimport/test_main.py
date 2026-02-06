@@ -367,3 +367,81 @@ class TestMain:
         captured = capsys.readouterr()
         # Should have 2 error messages
         assert captured.err.count("error processing") == 2
+
+    @patch.object(rimport, "replace_one_file_with_symlink")
+    @patch.object(rimport, "get_staging_root")
+    @patch.object(rimport, "normalize_paths")
+    @patch.object(rimport, "ensure_running_as")
+    def test_error_if_file_already_published_but_relink_fails(
+        self,
+        _mock_ensure_running_as,
+        mock_normalize_paths,
+        mock_get_staging_root,
+        _mock_replace_one_file_with_symlink,
+        tmp_path,
+        capsys,
+    ):
+        """
+        Test that main() returns error code 1 if attempting to relink an already-published file
+        fails.
+        """
+        inputdata_root = tmp_path / "inputdata"
+        inputdata_root.mkdir()
+        staging_root = tmp_path / "staging"
+        staging_root.mkdir()
+
+        filename = "test.nc"
+        src = inputdata_root / filename
+        src.write_text("some data")
+        assert src.exists()
+        dst = staging_root / filename
+        dst.write_text("some data")
+
+        mock_get_staging_root.return_value = staging_root
+        test_file = inputdata_root / filename
+        mock_normalize_paths.return_value = [test_file]
+
+        result = rimport.main(["-inputdata", str(inputdata_root), str(src)])
+
+        assert result == 1
+        captured = capsys.readouterr()
+        assert "rimport: error processing" in captured.err
+        assert "Error relinking during rimport" in captured.err
+
+    @patch.object(rimport, "replace_one_file_with_symlink")
+    @patch.object(rimport, "get_staging_root")
+    @patch.object(rimport, "normalize_paths")
+    @patch.object(rimport, "ensure_running_as")
+    def test_error_if_file_newly_published_but_relink_fails(
+        self,
+        _mock_ensure_running_as,
+        mock_normalize_paths,
+        mock_get_staging_root,
+        _mock_replace_one_file_with_symlink,
+        tmp_path,
+        capsys,
+    ):
+        """
+        Test that main() returns error code 1 if attempting to relink a newly-published file
+        fails.
+        """
+        inputdata_root = tmp_path / "inputdata"
+        inputdata_root.mkdir()
+        staging_root = tmp_path / "staging"
+        staging_root.mkdir()
+
+        filename = "test.nc"
+        src = inputdata_root / filename
+        src.write_text("some data")
+        assert src.exists()
+
+        mock_get_staging_root.return_value = staging_root
+        test_file = inputdata_root / filename
+        mock_normalize_paths.return_value = [test_file]
+
+        result = rimport.main(["-inputdata", str(inputdata_root), str(src)])
+
+        assert result == 1
+        captured = capsys.readouterr()
+        assert "rimport: error processing" in captured.err
+        assert "Error relinking during rimport" in captured.err
