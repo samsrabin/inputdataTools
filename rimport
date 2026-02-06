@@ -306,6 +306,35 @@ def print_can_file_be_downloaded(file_can_be_downloaded: bool):
         logger.info("%sFile is not (yet) available for download.", INDENT)
 
 
+def get_files_to_process(file: str, filelist: str):
+    """Get list of files to process.
+
+    Uses either --file or --filelist. "Prefers" --file, but they're actually mutually exclusive, so
+    don't rely on that.
+
+    Args:
+        file (str): Single file to process.
+        filelist (str): File containing list of files to process
+
+    Returns:
+        list: List of files to process
+        int:  Result code
+    """
+    if file is not None:
+        files_to_process = [file]
+    else:
+        list_path = Path(filelist).expanduser().resolve()
+        if not list_path.exists():
+            logger.error("rimport: list file not found: %s", list_path)
+            return None, 2
+        files_to_process = read_filelist(list_path)
+        if not files_to_process:
+            logger.error("rimport: no filenames found in list: %s", list_path)
+            return None, 2
+
+    return files_to_process, 0
+
+
 def main(argv: List[str] | None = None) -> int:
     """Main entry point for the rimport tool.
 
@@ -346,18 +375,10 @@ def main(argv: List[str] | None = None) -> int:
         logger.error("rimport: inputdata directory does not exist: %s", root)
         return 2
 
-    # Determine the list of filenames to handle
-    if args.file is not None:
-        files_to_process = [args.file]
-    else:
-        list_path = Path(args.filelist).expanduser().resolve()
-        if not list_path.exists():
-            logger.error("rimport: list file not found: %s", list_path)
-            return 2
-        files_to_process = read_filelist(list_path)
-        if not files_to_process:
-            logger.error("rimport: no filenames found in list: %s", list_path)
-            return 2
+    # Determine the list of relative filenames to handle
+    files_to_process, status = get_files_to_process(args.file, args.filelist)
+    if status:
+        return status
 
     # Resolve to full paths (keep accepting absolute names too)
     paths = normalize_paths(root, files_to_process)
