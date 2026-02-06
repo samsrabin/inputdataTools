@@ -9,7 +9,6 @@ Do `rimport --help` for more information.
 from __future__ import annotations
 
 import argparse
-import logging
 import os
 import pwd
 import shutil
