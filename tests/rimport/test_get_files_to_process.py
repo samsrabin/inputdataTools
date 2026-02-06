@@ -1,8 +1,5 @@
 """
-Tests for main() function in rimport script.
-
-These tests focus on the logic and control flow in main(), mocking out
-the helper functions to isolate main()'s behavior.
+Tests for get_files_to_process function in rimport script.
 """
 
 import os
