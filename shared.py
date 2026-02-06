@@ -5,6 +5,7 @@ Things shared between rimport and relink
 import logging
 import argparse
 import os
+import sys
 
 DEFAULT_INPUTDATA_ROOT = "/glade/campaign/cesm/cesmdata/cseg/inputdata/"
 DEFAULT_STAGING_ROOT = (
@@ -30,6 +31,37 @@ def get_log_level(quiet: bool = False, verbose: bool = False) -> int:
     if verbose:
         return logging.DEBUG
     return logging.INFO
+
+
+def configure_logging(logger, log_level: int) -> None:
+    """Configure logging to send INFO/WARNING to stdout and ERROR/CRITICAL to stderr.
+
+    Sets up two handlers:
+    - INFO handler: Sends INFO, WARNING, and DEBUG level messages to stdout
+    - ERROR handler: Sends ERROR and CRITICAL level messages to stderr
+
+    Both handlers use simple message-only formatting without timestamps or level names.
+
+    Args:
+        log_level: Minimum logging level (DEBUG, INFO, or WARNING).
+    """
+    logger.setLevel(log_level)
+
+    # Handler for INFO, WARNING, and DEBUG level messages -> stdout
+    info_handler = logging.StreamHandler(sys.stdout)
+    info_handler.setLevel(logging.DEBUG)  # Accept all levels, filter will handle it
+    info_handler.addFilter(lambda record: record.levelno < logging.ERROR)
+    info_handler.setFormatter(logging.Formatter("%(message)s"))
+
+    # Handler for ERROR and CRITICAL level messages -> stderr
+    error_handler = logging.StreamHandler(sys.stderr)
+    error_handler.setLevel(logging.ERROR)
+    error_handler.setFormatter(logging.Formatter("%(message)s"))
+
+    # Clear any existing handlers and add our custom ones
+    logger.handlers.clear()
+    logger.addHandler(info_handler)
+    logger.addHandler(error_handler)
 
 
 def add_inputdata_root(parser: argparse.ArgumentParser):

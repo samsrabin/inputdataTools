@@ -1,26 +1,14 @@
 """
-Tests for configure_logging() function in rimport script.
+Tests for shared configure_logging() function.
 """
 
-import os
-import sys
-import importlib.util
 import logging
-from importlib.machinery import SourceFileLoader
 
 import pytest
 
-# Import rimport module from file without .py extension
-rimport_path = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
-    "rimport",
-)
-loader = SourceFileLoader("rimport", rimport_path)
-spec = importlib.util.spec_from_loader("rimport", loader)
-if spec is None:
-    raise ImportError(f"Could not create spec for rimport from {rimport_path}")
-rimport = importlib.util.module_from_spec(spec)
-loader.exec_module(rimport)
+import shared
+
+logger = logging.getLogger(__name__)
 
 
 class TestConfigureLogging:
@@ -31,22 +19,22 @@ class TestConfigureLogging:
         """Clean up logger handlers after each test."""
         yield
         # Clear handlers after test
-        rimport.logger.handlers.clear()
+        logger.handlers.clear()
 
     def test_sets_logger_level_to_info(self):
         """Test that configure_logging sets the logger level to INFO."""
-        rimport.configure_logging(logging.INFO)
-        assert rimport.logger.level == logging.INFO
+        shared.configure_logging(logger, logging.INFO)
+        assert logger.level == logging.INFO
 
     def test_creates_two_handlers(self):
         """Test that configure_logging creates exactly two handlers."""
-        rimport.configure_logging(logging.INFO)
-        assert len(rimport.logger.handlers) == 2
+        shared.configure_logging(logger, logging.INFO)
+        assert len(logger.handlers) == 2
 
     def test_info_handler_goes_to_stdout(self, capsys):
         """Test that INFO level messages go to stdout."""
-        rimport.configure_logging(logging.INFO)
-        rimport.logger.info("Test info message")
+        shared.configure_logging(logger, logging.INFO)
+        logger.info("Test info message")
 
         captured = capsys.readouterr()
         assert "Test info message" in captured.out
@@ -54,8 +42,8 @@ class TestConfigureLogging:
 
     def test_warning_handler_goes_to_stdout(self, capsys):
         """Test that WARNING level messages go to stdout."""
-        rimport.configure_logging(logging.INFO)
-        rimport.logger.warning("Test warning message")
+        shared.configure_logging(logger, logging.INFO)
+        logger.warning("Test warning message")
 
         captured = capsys.readouterr()
         assert "Test warning message" in captured.out
@@ -63,8 +51,8 @@ class TestConfigureLogging:
 
     def test_error_handler_goes_to_stderr(self, capsys):
         """Test that ERROR level messages go to stderr."""
-        rimport.configure_logging(logging.INFO)
-        rimport.logger.error("Test error message")
+        shared.configure_logging(logger, logging.INFO)
+        logger.error("Test error message")
 
         captured = capsys.readouterr()
         assert captured.out == ""
@@ -72,8 +60,8 @@ class TestConfigureLogging:
 
     def test_critical_handler_goes_to_stderr(self, capsys):
         """Test that CRITICAL level messages go to stderr."""
-        rimport.configure_logging(logging.INFO)
-        rimport.logger.critical("Test critical message")
+        shared.configure_logging(logger, logging.INFO)
+        logger.critical("Test critical message")
 
         captured = capsys.readouterr()
         assert captured.out == ""
@@ -84,20 +72,20 @@ class TestConfigureLogging:
         # Add a dummy handler
         from io import StringIO
         dummy_handler = logging.StreamHandler(StringIO())
-        rimport.logger.addHandler(dummy_handler)
-        assert len(rimport.logger.handlers) >= 1
+        logger.addHandler(dummy_handler)
+        assert len(logger.handlers) >= 1
 
         # Configure logging
-        rimport.configure_logging(logging.INFO)
+        shared.configure_logging(logger, logging.INFO)
 
         # Verify old handlers were cleared and new ones added
-        assert len(rimport.logger.handlers) == 2
-        assert dummy_handler not in rimport.logger.handlers
+        assert len(logger.handlers) == 2
+        assert dummy_handler not in logger.handlers
 
     def test_formatter_uses_message_only(self, capsys):
         """Test that the formatter outputs only the message without level/timestamp."""
-        rimport.configure_logging(logging.INFO)
-        rimport.logger.info("Simple message")
+        shared.configure_logging(logger, logging.INFO)
+        logger.info("Simple message")
 
         captured = capsys.readouterr()
         output = captured.out.strip()
@@ -106,21 +94,21 @@ class TestConfigureLogging:
 
     def test_multiple_calls_dont_duplicate_handlers(self):
         """Test that calling configure_logging multiple times doesn't duplicate handlers."""
-        rimport.configure_logging(logging.INFO)
-        assert len(rimport.logger.handlers) == 2
+        shared.configure_logging(logger, logging.INFO)
+        assert len(logger.handlers) == 2
 
-        rimport.configure_logging(logging.INFO)
-        assert len(rimport.logger.handlers) == 2  # Still 2, not 4
+        shared.configure_logging(logger, logging.INFO)
+        assert len(logger.handlers) == 2  # Still 2, not 4
 
-        rimport.configure_logging(logging.INFO)
-        assert len(rimport.logger.handlers) == 2  # Still 2, not 6
+        shared.configure_logging(logger, logging.INFO)
+        assert len(logger.handlers) == 2  # Still 2, not 6
 
     def test_configure_with_debug_level(self, capsys):
         """Test that configure_logging accepts DEBUG level."""
-        rimport.configure_logging(logging.DEBUG)
+        shared.configure_logging(logger, logging.DEBUG)
 
         # DEBUG messages should now be logged
-        rimport.logger.debug("Debug message")
+        logger.debug("Debug message")
 
         captured = capsys.readouterr()
         assert "Debug message" in captured.out
@@ -128,12 +116,12 @@ class TestConfigureLogging:
 
     def test_configure_with_warning_level(self, capsys):
         """Test that configure_logging accepts WARNING level."""
-        rimport.configure_logging(logging.WARNING)
+        shared.configure_logging(logger, logging.WARNING)
 
         # INFO messages should be suppressed
-        rimport.logger.info("Info message")
+        logger.info("Info message")
         # WARNING messages should be logged
-        rimport.logger.warning("Warning message")
+        logger.warning("Warning message")
 
         captured = capsys.readouterr()
         assert "Info message" not in captured.out
@@ -142,10 +130,10 @@ class TestConfigureLogging:
 
     def test_configure_with_info_level_suppresses_debug(self, capsys):
         """Test that INFO level suppresses DEBUG messages."""
-        rimport.configure_logging(logging.INFO)
+        shared.configure_logging(logger, logging.INFO)
 
-        rimport.logger.debug("Debug message")
-        rimport.logger.info("Info message")
+        logger.debug("Debug message")
+        logger.info("Info message")
 
         captured = capsys.readouterr()
         assert "Debug message" not in captured.out
