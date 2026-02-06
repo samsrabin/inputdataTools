@@ -45,7 +45,10 @@ def build_parser() -> argparse.ArgumentParser:
         argparse.ArgumentParser: Configured parser ready to parse command-line arguments.
     """
     parser = argparse.ArgumentParser(
-        description="Copy files from CESM inputdata directory to a publishing directory.",
+        description=(
+            f"Copy files from CESM inputdata directory ({DEFAULT_INPUTDATA_ROOT}) to a publishing"
+            " directory."
+        ),
         add_help=False,  # Disable automatic help to add custom -help flag
     )
 
@@ -56,7 +59,7 @@ def build_parser() -> argparse.ArgumentParser:
         "-file",
         dest="file",
         metavar="filename",
-        help="Provide a single filename relative to the top inputdata directory",
+        help="Provide a file to import. Must be in the CESM inputdata directory.",
     )
     group.add_argument(
         "--list",
@@ -65,7 +68,7 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="filelist",
         help=(
             "Provide a file that contains a list of filenames to import. All filenames in the list"
-            "are relative to the top inputdata area."
+            " must be in the CESM inputdata directory."
         ),
     )
 
@@ -343,21 +346,21 @@ def main(argv: List[str] | None = None) -> int:
         logger.error("rimport: inputdata directory does not exist: %s", root)
         return 2
 
-    # Determine the list of relative filenames to handle
+    # Determine the list of filenames to handle
     if args.file is not None:
-        relnames = [args.file]
+        files_to_process = [args.file]
     else:
         list_path = Path(args.filelist).expanduser().resolve()
         if not list_path.exists():
             logger.error("rimport: list file not found: %s", list_path)
             return 2
-        relnames = read_filelist(list_path)
-        if not relnames:
+        files_to_process = read_filelist(list_path)
+        if not files_to_process:
             logger.error("rimport: no filenames found in list: %s", list_path)
             return 2
 
     # Resolve to full paths (keep accepting absolute names too)
-    paths = normalize_paths(root, relnames)
+    paths = normalize_paths(root, files_to_process)
     staging_root = get_staging_root()
     # Execute the new action per file
     errors = 0
