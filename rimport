@@ -71,6 +71,12 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
 
+    parser.add_argument(
+        "items_to_process",
+        nargs="*",
+        help="One or more files to process. (Optional; can use --file instead to process just one.)"
+    )
+
     # Add inputdata_root option flags
     shared.add_inputdata_root(parser)
 
@@ -305,14 +311,15 @@ def print_can_file_be_downloaded(file_can_be_downloaded: bool):
         logger.info("%sFile is not (yet) available for download.", INDENT)
 
 
-def get_files_to_process(file: str, filelist: str):
+def get_files_to_process(file: str, filelist: str, items_to_process: list):
     """Get list of files to process.
 
-    Uses --file and/or --filelist arguments.
+    Uses --file and/or --filelist arguments, as well as positional items_to_process if given.
 
     Args:
         file (str): Single file to process.
         filelist (str): File containing list of files to process.
+        items_to_process (list): List of files to process.
 
     Returns:
         list: List of files to process
@@ -333,6 +340,9 @@ def get_files_to_process(file: str, filelist: str):
             logger.error("rimport: no filenames found in list: %s", list_path)
             return None, 2
         files_to_process.extend(files_in_list)
+
+    if items_to_process:
+        files_to_process.extend(items_to_process)
 
     if not files_to_process:
         logger.error("rimport: At least one of --file or --filelist is required")
@@ -382,7 +392,7 @@ def main(argv: List[str] | None = None) -> int:
         return 2
 
     # Determine the list of relative filenames to handle
-    files_to_process, status = get_files_to_process(args.file, args.filelist)
+    files_to_process, status = get_files_to_process(args.file, args.filelist, args.items_to_process)
     if status:
         return status
 

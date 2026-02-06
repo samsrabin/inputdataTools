@@ -39,7 +39,7 @@ class TestGetRelnamesToProcess:
 
         # Run
         files_to_process, result = rimport.get_files_to_process(
-            file=filename, filelist=None
+            file=filename, filelist=None, items_to_process=None,
         )
 
         # Verify
@@ -60,7 +60,7 @@ class TestGetRelnamesToProcess:
 
         # Run
         files_to_process, result = rimport.get_files_to_process(
-            file=test_file, filelist=None
+            file=test_file, filelist=None, items_to_process=None,
         )
 
         # Verify
@@ -87,7 +87,7 @@ class TestGetRelnamesToProcess:
 
         # Run
         files_to_process, result = rimport.get_files_to_process(
-            file=None, filelist=filelist_relpath
+            file=None, filelist=filelist_relpath, items_to_process=None,
         )
 
         # Verify
@@ -113,7 +113,7 @@ class TestGetRelnamesToProcess:
 
         # Run
         files_to_process, result = rimport.get_files_to_process(
-            file=None, filelist=filelist
+            file=None, filelist=filelist, items_to_process=None,
         )
 
         # Verify
@@ -140,7 +140,7 @@ class TestGetRelnamesToProcess:
 
         # Run
         files_to_process, result = rimport.get_files_to_process(
-            file=None, filelist=filelist_relpath
+            file=None, filelist=filelist_relpath, items_to_process=None,
         )
 
         # Verify
@@ -166,7 +166,7 @@ class TestGetRelnamesToProcess:
 
         # Run
         files_to_process, result = rimport.get_files_to_process(
-            file=None, filelist=filelist
+            file=None, filelist=filelist, items_to_process=None,
         )
 
         # Verify
@@ -178,7 +178,7 @@ class TestGetRelnamesToProcess:
         filelist = "bsfearirn"
         assert not os.path.exists(filelist)
         files_to_process, result = rimport.get_files_to_process(
-            file=None, filelist=filelist
+            file=None, filelist=filelist, items_to_process=None,
         )
         assert result == 2
         assert files_to_process is None
@@ -188,10 +188,80 @@ class TestGetRelnamesToProcess:
         filelist = tmp_path / "bsfearirn"
         filelist.write_text("")
         files_to_process, result = rimport.get_files_to_process(
-            file=None, filelist=filelist
+            file=None, filelist=filelist, items_to_process=[],
         )
         assert result == 2
         assert files_to_process is None
+
+    def test_items_to_process_abspaths(self, tmp_path):
+        """Test giving it a list of absolute paths in items_to_process"""
+        # Setup
+        inputdata_root = tmp_path / "inputdata"
+        inputdata_root.mkdir()
+        staging_root = tmp_path / "staging"
+        staging_root.mkdir()
+
+        filenames = []
+        for i in range(2):
+            filename = inputdata_root / f"test{i}.txt"
+            filenames.append(str(filename))
+            filename.write_text("def567")
+
+        # Run
+        files_to_process, result = rimport.get_files_to_process(
+            file=None, filelist=None, items_to_process=filenames,
+        )
+
+        # Verify
+        assert result == 0
+        assert files_to_process == filenames
+
+    def test_items_to_process_relpaths(self, tmp_path):
+        """Test giving it a list of relative paths in items_to_process"""
+        # Setup
+        inputdata_root = tmp_path / "inputdata"
+        inputdata_root.mkdir()
+
+        filenames = []
+        for i in range(2):
+            filename = inputdata_root / f"test{i}.txt"
+            filenames.append(os.path.basename(filename))
+            filename.write_text("def567")
+
+        # Run
+        files_to_process, result = rimport.get_files_to_process(
+            file=None, filelist=None, items_to_process=filenames,
+        )
+
+        # Verify
+        assert result == 0
+        assert files_to_process == filenames
+
+    def test_items_to_process_mixpaths(self, tmp_path):
+        """Test giving it a list of absolute and relative paths in items_to_process"""
+        # Setup
+        inputdata_root = tmp_path / "inputdata"
+        inputdata_root.mkdir()
+
+        filenames = []
+        for i in range(2):
+            filename = inputdata_root / f"test{i}.txt"
+            filenames.append(os.path.basename(filename))
+            filename.write_text("def567")
+        for i in range(2):
+            filename = inputdata_root / f"test{2*i}.txt"
+            filenames.append(str(filename))
+            filename.write_text("def567")
+        assert len(filenames) == 4
+
+        # Run
+        files_to_process, result = rimport.get_files_to_process(
+            file=None, filelist=None, items_to_process=filenames,
+        )
+
+        # Verify
+        assert result == 0
+        assert files_to_process == filenames
 
     def test_single_file_and_list(self, tmp_path):
         """Test giving it a single file by its relative path"""
@@ -216,18 +286,18 @@ class TestGetRelnamesToProcess:
 
         # Run
         files_to_process, result = rimport.get_files_to_process(
-            file=filename, filelist=filelist
+            file=filename, filelist=filelist, items_to_process=None,
         )
 
         # Verify
         assert result == 0
         assert files_to_process == [filename] + filenames
 
-    def test_single_or_list_required(self):
-        """Test that either file or filelist is required"""
+    def test_single_or_filelist_or_list_required(self):
+        """Test that at least one of file, filelist, items_to_process is required"""
         # Run
         files_to_process, result = rimport.get_files_to_process(
-            file=None, filelist=None
+            file=None, filelist=None, items_to_process=None,
         )
 
         # Verify

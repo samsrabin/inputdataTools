@@ -68,6 +68,27 @@ class TestBuildParser:
         args = parser.parse_args(["-file", file, "-list", filelist])
         assert args.file == file
         assert args.filelist == filelist
+        assert args.items_to_process == []
+
+    def test_positional_items_to_process(self):
+        """Test that positional items_to_process are accepted"""
+        parser = rimport.build_parser()
+        items_to_process = ["abc123", "def456"]
+        args = parser.parse_args(items_to_process)
+        assert args.file is None
+        assert args.filelist is None
+        assert args.items_to_process == items_to_process
+
+    def test_file_and_list_ok_with_items_to_process(self):
+        """Test that -file and -list can be used together with items_to_process"""
+        parser = rimport.build_parser()
+        file = "test.txt"
+        filelist = "files.txt"
+        items_to_process = ["abc123", "def456"]
+        args = parser.parse_args(["-file", file, "-list", filelist, *items_to_process])
+        assert args.file == file
+        assert args.filelist == filelist
+        assert args.items_to_process == items_to_process
 
     def test_inputdata_default(self):
         """Test that -inputdata has correct default value."""
