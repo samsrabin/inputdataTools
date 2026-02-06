@@ -5,7 +5,6 @@ relative path in a target directory tree.
 """
 
 import os
-import sys
 import pwd
 import argparse
 import logging
@@ -20,6 +19,7 @@ from shared import (
     add_inputdata_root,
     validate_paths,
     validate_directory,
+    configure_logging,
 )
 
 # Set up logger
@@ -389,7 +389,7 @@ def main():
 
     args = parse_arguments()
 
-    logging.basicConfig(level=args.log_level, format="%(message)s", stream=sys.stdout)
+    configure_logging(logger, args.log_level)
 
     my_username = os.environ["USER"]
 
