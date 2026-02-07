@@ -41,6 +41,7 @@ class TestMain:
         mock_get_staging_root,
         mock_stage_data,
         tmp_path,
+        caplog,
     ):
         """Test main() logic flow when a single file stages successfully."""
         # Setup
@@ -62,6 +63,7 @@ class TestMain:
         mock_stage_data.assert_called_once_with(
             test_file, inputdata_root, staging_root, False
         )
+        assert "No need to run relink.py" in caplog.text
 
     @patch.object(rimport, "stage_data")
     @patch.object(rimport, "get_staging_root")
@@ -153,6 +155,10 @@ class TestMain:
         assert "error processing" in captured.err
         assert "Test error for file2" in captured.err
 
+        # Check that message about not needing to run relink was NOT printed
+        assert "No need to run relink.py" not in captured.err
+        assert "No need to run relink.py" not in captured.out
+
     @patch.object(rimport, "ensure_running_as")
     def test_nonexistent_inputdata_directory(
         self, _mock_ensure_running_as, tmp_path, capsys
@@ -226,6 +232,7 @@ class TestMain:
         mock_get_staging_root,
         mock_stage_data,
         tmp_path,
+        caplog,
     ):
         """Test that --check mode skips the user check but does call stage_data."""
         inputdata_root = tmp_path / "inputdata"
@@ -248,6 +255,8 @@ class TestMain:
         mock_stage_data.assert_called_once_with(
             test_file, inputdata_root, staging_root, True
         )
+        # Message about relink.py should not have been printed
+        assert "No need to run relink.py" not in caplog.text
 
     @patch.object(rimport, "stage_data")
     @patch.object(rimport, "get_staging_root")

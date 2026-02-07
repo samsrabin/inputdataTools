@@ -431,7 +431,11 @@ def main(argv: List[str] | None = None) -> int:
             errors += 1
             logger.error("%srimport: error processing %s: %s", INDENT, p, e)
 
-    return 0 if errors == 0 else 1
+    if errors:
+        return 1
+    if not args.check:
+        logger.info("\nNo need to run relink.py")
+    return 0
 
 
 if __name__ == "__main__":
