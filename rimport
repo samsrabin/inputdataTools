@@ -48,7 +48,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
             f"Copy files from CESM inputdata directory ({DEFAULT_INPUTDATA_ROOT}) to a publishing"
-            " directory."
+            " directory, then replace the original with a symlink to the copy."
         ),
         add_help=False,  # Disable automatic help to add custom -help flag
     )
